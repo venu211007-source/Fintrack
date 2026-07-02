@@ -1,0 +1,14 @@
+financial.db
+uploads/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.zip
+debug_pdf*.py
+test_parser.py
+verify_parser.py
+generate_statements.py
+seed_data.py
+samples/
+.DS_Store

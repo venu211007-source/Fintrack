@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Login — FinTrack{% endblock %}
+{% block content %}
+<div class="auth-wrapper d-flex align-items-center justify-content-center min-vh-100">
+  <div class="card auth-card shadow border-0">
+    <div class="card-body p-5">
+      <div class="text-center mb-4">
+        <div class="brand-icon mb-3"><i class="bi bi-bank2"></i></div>
+        <h3 class="fw-bold">FinTrack</h3>
+        <p class="text-muted mb-0">Personal Financial Dashboard</p>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+      <div class="alert alert-{{ 'danger' if cat=='error' else cat }} alert-dismissible fade show" role="alert">
+        {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+      {% endwith %}
+
+      <form method="POST">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Email Address</label>
+          <div class="input-group">
+            <span class="input-group-text bg-light border-end-0"><i class="bi bi-envelope"></i></span>
+            <input type="email" name="email" class="form-control border-start-0 ps-0"
+                   placeholder="you@example.com" required autofocus>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Password</label>
+          <div class="input-group">
+            <span class="input-group-text bg-light border-end-0"><i class="bi bi-lock"></i></span>
+            <input type="password" name="password" id="pwField" class="form-control border-start-0 ps-0"
+                   placeholder="••••••••" required>
+            <button class="btn btn-outline-secondary border-start-0" type="button"
+                    onclick="togglePw('pwField',this)"><i class="bi bi-eye"></i></button>
+          </div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="remember" id="remember">
+            <label class="form-check-label text-muted" for="remember">Remember me</label>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+        </button>
+      </form>
+
+      <hr class="my-4">
+      <p class="text-center mb-0 text-muted">
+        Don't have an account? <a href="{{ url_for('register') }}" class="fw-semibold text-decoration-none">Create one</a>
+      </p>
+    </div>
+  </div>
+</div>
+<script>
+function togglePw(id, btn) {
+  const f = document.getElementById(id);
+  if (f.type === 'password') { f.type = 'text'; btn.innerHTML = '<i class="bi bi-eye-slash"></i>'; }
+  else { f.type = 'password'; btn.innerHTML = '<i class="bi bi-eye"></i>'; }
+}
+</script>
+{% endblock %}

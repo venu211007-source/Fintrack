@@ -1,0 +1,388 @@
+{% extends 'base.html' %}
+{% block title %}Transactions — FinTrack{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0">Transactions</h4>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTxnModal">
+    <i class="bi bi-plus-lg me-1"></i>Add Manual
+  </button>
+</div>
+
+{% if missing_rates %}
+<div class="alert alert-warning alert-dismissible fade show d-flex align-items-center gap-3 mb-3" role="alert">
+  <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
+  <div>
+    <strong>Exchange rates missing for: {{ missing_rates | join(', ') }}</strong> —
+    Base amounts shown are 1:1 (wrong).
+    <a href="{{ url_for('settings') }}" class="alert-link">Fix in Settings</a>
+  </div>
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Date Range Filter Card -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-3">
+    <!-- Quick Presets -->
+    <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+      <span class="text-muted small fw-semibold me-1">Quick:</span>
+      <button type="button" class="btn btn-outline-secondary btn-sm preset-btn" data-days="7">Last 7 days</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm preset-btn" data-days="15">Last 15 days</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm preset-btn" data-days="30">Last 30 days</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm preset-btn" data-days="60">Last 2 months</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm preset-btn" data-days="90">Last 3 months</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="thisMonthBtn">This month</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" id="thisYearBtn">This year</button>
+      {% if date_from or date_to %}
+      <a href="{{ url_for('transactions') }}" class="btn btn-outline-danger btn-sm ms-auto">
+        <i class="bi bi-x-lg me-1"></i>Clear filter
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Custom Range + Other Filters -->
+    <form method="GET" id="filterForm" class="row g-2 align-items-end">
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">From date</label>
+        <input type="date" name="date_from" id="dateFrom" class="form-control form-control-sm"
+               value="{{ date_from or '' }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">To date</label>
+        <input type="date" name="date_to" id="dateTo" class="form-control form-control-sm"
+               value="{{ date_to or '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small mb-1">Account</label>
+        <select name="account_id" class="form-select form-select-sm">
+          <option value="">All Accounts</option>
+          {% for acc in accounts %}
+          <option value="{{ acc.id }}" {% if sel_account==acc.id %}selected{% endif %}>{{ acc.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small mb-1">Category</label>
+        <select name="category" class="form-select form-select-sm">
+          <option value="">All Categories</option>
+          {% for cat in ['Salary','Investment','Food & Dining','Shopping','Transport','Utilities',
+                         'Healthcare','Entertainment','Rent','Education','Insurance','EMI / Loan','Uncategorized'] %}
+          <option {% if cat_filter==cat %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-1">
+        <div class="form-check mt-4">
+          <input class="form-check-input" type="checkbox" name="show_transfers" value="1" id="chkTfr"
+                 {% if show_transfers %}checked{% endif %}>
+          <label class="form-check-label small" for="chkTfr">Transfers</label>
+        </div>
+      </div>
+      <div class="col-md-2 d-flex gap-2 align-items-end">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i>Apply
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Summary Banner (only when a filter is active) -->
+{% if has_filter %}
+<div class="row g-3 mb-3">
+  <div class="col-4">
+    <div class="card border-0 bg-success-subtle text-center py-2 px-3">
+      <div class="text-muted small">Income</div>
+      <div class="fw-bold text-success">{{ current_user.base_currency }} {{ '{:,.2f}'.format(sum_income) }}</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card border-0 bg-danger-subtle text-center py-2 px-3">
+      <div class="text-muted small">Expenses</div>
+      <div class="fw-bold text-danger">{{ current_user.base_currency }} {{ '{:,.2f}'.format(sum_expense) }}</div>
+    </div>
+  </div>
+  <div class="col-4">
+    <div class="card border-0 {% if sum_net >= 0 %}bg-primary-subtle{% else %}bg-warning-subtle{% endif %} text-center py-2 px-3">
+      <div class="text-muted small">Net</div>
+      <div class="fw-bold {% if sum_net < 0 %}text-danger{% else %}text-primary{% endif %}">
+        {{ current_user.base_currency }} {{ '{:,.2f}'.format(sum_net) }}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Transaction Table -->
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    {% if transactions.items %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Date</th>
+            <th>Description</th>
+            <th>Category</th>
+            <th>Account</th>
+            <th class="text-end">Amount</th>
+            <th class="text-end">Base</th>
+            <th class="text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transactions.items %}
+          <tr id="row{{ t.id }}" class="{% if t.is_internal_transfer %}table-secondary{% endif %}">
+            <td class="ps-3 text-muted small text-nowrap">{{ t.date.strftime('%d %b %Y') }}</td>
+            <td class="small">
+              {% if t.is_internal_transfer %}
+              <span class="badge bg-secondary-subtle text-secondary me-1">Transfer</span>
+              {% endif %}
+              <span id="desc{{ t.id }}">{{ (t.description or '')[:50] }}</span>
+              {% if t.notes %}
+              <i class="bi bi-chat-text text-muted ms-1" title="{{ t.notes }}"></i>
+              {% endif %}
+            </td>
+            <td>
+              <select class="form-select form-select-sm cat-select" style="min-width:130px"
+                      data-id="{{ t.id }}" onchange="updateCat(this)">
+                {% for cat in ['Salary','Investment','Food & Dining','Shopping','Transport','Utilities',
+                               'Healthcare','Entertainment','Rent','Education','Insurance','EMI / Loan','Uncategorized'] %}
+                <option {% if t.category==cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td class="text-muted small">{{ t.account.name }}</td>
+            <td class="text-end fw-semibold text-nowrap {% if t.amount > 0 %}text-success{% else %}text-danger{% endif %}">
+              {% if t.amount > 0 %}+{% endif %}{{ t.account.currency }} {{ '{:,.2f}'.format(t.amount|abs) }}
+            </td>
+            <td class="text-end text-muted small text-nowrap">
+              {% if t.amount_base %}
+                {{ current_user.base_currency }} {{ '{:,.2f}'.format(t.amount_base|abs) }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              <div class="d-flex justify-content-center gap-1">
+                <button class="btn btn-sm btn-outline-secondary" title="Toggle transfer"
+                        onclick="toggleTransfer({{ t.id }}, {{ 'true' if t.is_internal_transfer else 'false' }})">
+                  <i class="bi bi-arrow-left-right"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteTxn({{ t.id }})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if transactions.pages > 1 %}
+    <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+      <span class="text-muted small">
+        Showing {{ transactions.per_page * (transactions.page-1) + 1 }}–{{ [transactions.per_page * transactions.page, transactions.total]|min }}
+        of {{ transactions.total }} transactions
+      </span>
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          {% if transactions.has_prev %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="goPage({{ transactions.prev_num }})">‹</a>
+          </li>
+          {% endif %}
+          {% for p in transactions.iter_pages() %}
+            {% if p %}
+            <li class="page-item {% if p==transactions.page %}active{% endif %}">
+              <a class="page-link" href="#" onclick="goPage({{ p }})">{{ p }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+            {% endif %}
+          {% endfor %}
+          {% if transactions.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="#" onclick="goPage({{ transactions.next_num }})">›</a>
+          </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-inbox fs-1 d-block mb-3 opacity-25"></i>
+      <h6>No transactions found</h6>
+      <p class="small">Try adjusting the date range or <a href="{{ url_for('upload') }}">upload a statement</a>.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Add Manual Transaction Modal -->
+<div class="modal fade" id="addTxnModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-0">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Add Transaction</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Date</label>
+            <input type="date" id="txnDate" class="form-control" value="">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Account</label>
+            <select id="txnAccount" class="form-select">
+              {% for acc in accounts %}
+              <option value="{{ acc.id }}">{{ acc.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Description</label>
+            <input type="text" id="txnDesc" class="form-control" placeholder="e.g. Grocery shopping">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Amount</label>
+            <input type="number" id="txnAmount" class="form-control" step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Type</label>
+            <select id="txnType" class="form-select">
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Category</label>
+            <select id="txnCat" class="form-select">
+              {% for cat in ['Salary','Investment','Food & Dining','Shopping','Transport','Utilities',
+                             'Healthcare','Entertainment','Rent','Education','Insurance','EMI / Loan','Uncategorized'] %}
+              <option>{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveTransaction()">Add Transaction</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// ── Pagination: preserve all filters, only swap page ──────────────────────
+function goPage(p) {
+  const params = new URLSearchParams(window.location.search);
+  params.set('page', p);
+  window.location.href = '/transactions?' + params.toString();
+  return false;
+}
+
+// ── Quick preset helpers ──────────────────────────────────────────────────
+function toISO(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function applyRange(from, to) {
+  document.getElementById('dateFrom').value = from;
+  document.getElementById('dateTo').value = to;
+  document.getElementById('filterForm').submit();
+}
+
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const days = parseInt(btn.dataset.days);
+    const to   = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - days + 1);
+    applyRange(toISO(from), toISO(to));
+  });
+});
+
+document.getElementById('thisMonthBtn').addEventListener('click', () => {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  applyRange(toISO(from), toISO(to));
+});
+
+document.getElementById('thisYearBtn').addEventListener('click', () => {
+  const y = new Date().getFullYear();
+  applyRange(`${y}-01-01`, `${y}-12-31`);
+});
+
+// ── Highlight active preset after page load ───────────────────────────────
+(function highlightActive() {
+  const from = document.getElementById('dateFrom').value;
+  const to   = document.getElementById('dateTo').value;
+  if (!from || !to) return;
+  const toDay   = new Date(); toDay.setHours(0,0,0,0);
+  const toDate  = new Date(to + 'T00:00:00');
+  const fromDate= new Date(from + 'T00:00:00');
+  const diff    = Math.round((toDate - fromDate) / 86400000) + 1;
+  if (toISO(toDay) === to) {
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      if (parseInt(btn.dataset.days) === diff) btn.classList.replace('btn-outline-secondary','btn-secondary');
+    });
+  }
+})();
+
+// ── Category update ───────────────────────────────────────────────────────
+async function updateCat(sel) {
+  await fetch(`/transactions/${sel.dataset.id}/update`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({category: sel.value})
+  });
+}
+
+// ── Toggle internal transfer ──────────────────────────────────────────────
+async function toggleTransfer(id, current) {
+  const res = await fetch(`/transactions/${id}/update`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({is_internal_transfer: !current})
+  });
+  if ((await res.json()).success) location.reload();
+}
+
+// ── Delete transaction ────────────────────────────────────────────────────
+async function deleteTxn(id) {
+  if (!confirm('Delete this transaction?')) return;
+  const res = await fetch(`/transactions/${id}/delete`, {method:'POST'});
+  if ((await res.json()).success) {
+    const row = document.getElementById('row'+id);
+    row.style.transition = 'opacity 0.3s';
+    row.style.opacity = '0';
+    setTimeout(() => row.remove(), 300);
+  }
+}
+
+// ── Add manual transaction ────────────────────────────────────────────────
+async function saveTransaction() {
+  const payload = {
+    account_id:  document.getElementById('txnAccount').value,
+    date:        document.getElementById('txnDate').value,
+    description: document.getElementById('txnDesc').value,
+    amount:      parseFloat(document.getElementById('txnAmount').value || 0),
+    is_expense:  document.getElementById('txnType').value === 'expense',
+    category:    document.getElementById('txnCat').value,
+  };
+  if (!payload.date || !payload.amount) { alert('Date and amount are required.'); return; }
+  const res = await fetch('/transactions/add', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(payload)
+  });
+  if ((await res.json()).success) location.reload();
+}
+</script>
+{% endblock %}

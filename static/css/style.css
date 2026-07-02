@@ -1,0 +1,142 @@
+:root {
+  --primary: #0d6efd;
+  --dark-blue: #0f1a2e;
+  --sidebar-w: 0px;
+}
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: #f4f6fb;
+  color: #1a1a2e;
+  min-height: 100vh;
+}
+
+/* Navbar */
+.bg-dark-blue { background-color: var(--dark-blue) !important; }
+
+.avatar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: white;
+}
+
+/* Auth pages */
+.auth-wrapper { background: linear-gradient(135deg, #0f1a2e 0%, #1a3a6e 100%); }
+.auth-card {
+  width: 420px;
+  border-radius: 16px !important;
+  border: none;
+}
+
+.brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px; height: 64px;
+  background: linear-gradient(135deg, #0d6efd, #6610f2);
+  border-radius: 16px;
+  font-size: 1.8rem;
+  color: white;
+}
+
+/* Cards */
+.card {
+  border-radius: 12px !important;
+}
+
+.card-header {
+  border-radius: 12px 12px 0 0 !important;
+}
+
+/* KPI icons */
+.kpi-icon {
+  width: 48px; height: 48px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Net Worth hero */
+.nw-hero {
+  background: linear-gradient(135deg, #0f1a2e 0%, #1a3a6e 60%, #0d6efd 100%) !important;
+  color: white;
+  border-radius: 16px !important;
+}
+.nw-stat { padding: 0.5rem 1rem; }
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed #0d6efd !important;
+  border-radius: 12px !important;
+  background: #f8f9ff;
+  transition: background 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+.drop-zone.drag-over {
+  background: #e8f0fe;
+  border-color: #6610f2 !important;
+}
+
+/* Tables */
+.table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6c757d;
+  font-weight: 600;
+  border-top: none;
+}
+
+.table > :not(:first-child) { border-top: none; }
+
+/* Badges */
+.badge { font-weight: 500; }
+
+/* Utility */
+.x-small { font-size: 0.72rem; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+
+/* Transitions */
+.list-group-item, .card, .btn, tr { transition: background-color 0.15s ease; }
+
+.list-group-item:hover { background-color: #f8f9ff; }
+
+/* Progress bar thin */
+.progress { border-radius: 4px; background: #e9ecef; }
+
+/* Form inputs */
+.form-control, .form-select {
+  border-radius: 8px;
+  border-color: #dee2e6;
+  font-size: 0.9rem;
+}
+.form-control:focus, .form-select:focus {
+  border-color: #86b7fe;
+  box-shadow: 0 0 0 0.2rem rgba(13,110,253,.15);
+}
+
+/* Buttons */
+.btn { border-radius: 8px; font-weight: 500; }
+.btn-sm { border-radius: 6px; }
+
+/* Alert */
+.alert { border-radius: 10px; border: none; }
+
+/* Modal */
+.modal-content { border-radius: 16px !important; }
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .auth-card { width: 95vw !important; }
+  .container-fluid { padding-left: 12px !important; padding-right: 12px !important; }
+}

@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% block title %}Settings — FinTrack{% endblock %}
+{% block content %}
+
+<h4 class="fw-bold mb-4">Settings</h4>
+
+<div class="row g-4">
+  <!-- Profile Settings -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-0 pt-3 pb-0">
+        <h6 class="fw-bold mb-0"><i class="bi bi-person-circle me-2"></i>Profile</h6>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label text-muted small">Name</label>
+          <div class="fw-semibold">{{ current_user.name }}</div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label text-muted small">Email</label>
+          <div class="fw-semibold">{{ current_user.email }}</div>
+        </div>
+        <hr>
+        <form method="POST" action="{{ url_for('update_settings') }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Base (Reporting) Currency</label>
+            <select name="base_currency" class="form-select">
+              {% for code, name in [('USD','US Dollar'),('EUR','Euro'),('GBP','British Pound'),
+                ('INR','Indian Rupee'),('CAD','Canadian Dollar'),('AUD','Australian Dollar'),
+                ('SGD','Singapore Dollar'),('AED','UAE Dirham'),('JPY','Japanese Yen'),('CHF','Swiss Franc')] %}
+              <option value="{{ code }}" {% if current_user.base_currency==code %}selected{% endif %}>
+                {{ code }} — {{ name }}
+              </option>
+              {% endfor %}
+            </select>
+            <div class="form-text">All reports and net worth are consolidated in this currency.</div>
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-2"></i>Save Settings
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exchange Rates -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-3 pb-0">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <h6 class="fw-bold mb-0"><i class="bi bi-currency-exchange me-2"></i>Exchange Rates</h6>
+            <p class="text-muted small mb-0">Auto-updated daily from European Central Bank via Frankfurter</p>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-success fw-semibold" id="liveRateBtn" onclick="fetchLiveRates()">
+              <i class="bi bi-cloud-download me-1"></i>Update Live Rates
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#rateModal">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Status banner -->
+        <div id="rateStatus" class="mt-2" style="display:none"></div>
+
+        {% if rates_stale %}
+        <div class="alert alert-warning alert-sm py-2 px-3 mt-2 mb-0 small d-flex align-items-center gap-2">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          Rates are outdated — click <strong>Update Live Rates</strong> to refresh from today's market.
+        </div>
+        {% else %}
+        {% if rates %}
+        <div class="alert alert-success alert-sm py-2 px-3 mt-2 mb-0 small d-flex align-items-center gap-2">
+          <i class="bi bi-check-circle-fill"></i>
+          Rates are current.
+          Last updated: {{ rates[0].updated_at.strftime('%d %b %Y %H:%M') }} UTC
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+
+      <div class="card-body p-0">
+        {% if rates %}
+        <table class="table table-hover align-middle mb-0" id="ratesTable">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3">Pair</th>
+              <th class="text-end">Rate</th>
+              <th class="text-muted small">Meaning</th>
+              <th class="text-muted small text-center">Updated</th>
+              <th class="text-center">Delete</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rates %}
+            <tr id="rate{{ r.id }}">
+              <td class="ps-3">
+                <span class="badge bg-primary">{{ r.from_currency }}</span>
+                <i class="bi bi-arrow-right mx-1 text-muted"></i>
+                <span class="badge bg-secondary">{{ r.to_currency }}</span>
+              </td>
+              <td class="text-end fw-semibold font-monospace">{{ '%.6f'|format(r.rate) }}</td>
+              <td class="text-muted small">1 {{ r.from_currency }} = {{ '%.4f'|format(r.rate) }} {{ r.to_currency }}</td>
+              <td class="text-center text-muted small">
+                {{ r.updated_at.strftime('%d %b %H:%M') }}
+              </td>
+              <td class="text-center">
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteRate({{ r.id }})">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center text-muted py-4">
+          <i class="bi bi-currency-exchange fs-1 d-block mb-2 opacity-25"></i>
+          <p class="small mb-2">No exchange rates yet.</p>
+          <button class="btn btn-success btn-sm" onclick="fetchLiveRates()">
+            <i class="bi bi-cloud-download me-1"></i>Fetch Live Rates Automatically
+          </button>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="card-footer bg-white border-0 d-flex flex-column gap-2 pt-0">
+        <div class="alert alert-info small mb-0">
+          <i class="bi bi-info-circle me-2"></i>
+          <strong>How it works:</strong> Rates auto-refresh daily when you visit the Dashboard.
+          You can also click <em>Update Live Rates</em> any time to pull today's ECB rates instantly.
+          Manual rates can still be added with the <kbd>+</kbd> button for non-standard pairs.
+        </div>
+        <div class="alert alert-warning small mb-0">
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          After changing rates, recalculate to fix historical transaction amounts.
+          <form method="POST" action="{{ url_for('recalculate_rates') }}" class="mt-2">
+            <button type="submit" class="btn btn-warning btn-sm fw-semibold"
+                    onclick="return confirm('Recalculate base amounts for ALL transactions and re-run transfer detection?')">
+              <i class="bi bi-arrow-repeat me-1"></i>Recalculate All Transactions
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Rate Modal -->
+<div class="modal fade" id="rateModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content border-0">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Add Exchange Rate</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">From Currency</label>
+          <input type="text" id="rFrom" class="form-control text-uppercase" maxlength="3" placeholder="INR">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">To Currency</label>
+          <input type="text" id="rTo" class="form-control text-uppercase" maxlength="3"
+                 value="{{ current_user.base_currency }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Rate</label>
+          <input type="number" id="rRate" class="form-control" step="0.000001" placeholder="0.012">
+          <div class="form-text">1 FROM = ? TO</div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="saveRate()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function fetchLiveRates() {
+  const btn = document.getElementById('liveRateBtn');
+  const status = document.getElementById('rateStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Fetching…';
+  status.style.display = 'none';
+
+  try {
+    const res  = await fetch('/settings/fetch-rates', {method: 'POST'});
+    const data = await res.json();
+
+    if (data.errors && data.errors.length && !data.updated.length) {
+      status.innerHTML = `<div class="alert alert-danger py-2 px-3 small mb-0">
+        <i class="bi bi-x-circle me-1"></i>Failed: ${data.errors.join(', ')}
+      </div>`;
+    } else if (data.updated.length) {
+      const rows = data.updated.map(r =>
+        `<strong>${r.from}</strong>→${r.to}: <code>${r.rate.toFixed(6)}</code>`
+      ).join('  ·  ');
+      status.innerHTML = `<div class="alert alert-success py-2 px-3 small mb-0">
+        <i class="bi bi-check-circle me-1"></i>
+        <strong>Updated (${data.date}):</strong> ${rows}
+        — transaction amounts recalculated automatically.
+      </div>`;
+      // Reload after 2s so the table shows fresh timestamps
+      setTimeout(() => location.reload(), 2000);
+    } else {
+      status.innerHTML = `<div class="alert alert-info py-2 px-3 small mb-0">
+        <i class="bi bi-info-circle me-1"></i>No foreign currencies found — nothing to update.
+      </div>`;
+    }
+  } catch (e) {
+    status.innerHTML = `<div class="alert alert-danger py-2 px-3 small mb-0">
+      <i class="bi bi-x-circle me-1"></i>Network error: ${e.message}
+    </div>`;
+  }
+
+  status.style.display = 'block';
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-cloud-download me-1"></i>Update Live Rates';
+}
+
+async function saveRate() {
+  const from = document.getElementById('rFrom').value.toUpperCase();
+  const to   = document.getElementById('rTo').value.toUpperCase();
+  const rate = parseFloat(document.getElementById('rRate').value);
+  if (!from || !to || !rate) { alert('All fields are required.'); return; }
+  const res = await fetch('/settings/rate/add', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({from_currency:from, to_currency:to, rate})
+  });
+  if ((await res.json()).success) location.reload();
+}
+
+async function deleteRate(id) {
+  if (!confirm('Delete this rate?')) return;
+  const res = await fetch(`/settings/rate/${id}/delete`, {method:'POST'});
+  if ((await res.json()).success) document.getElementById('rate'+id).remove();
+}
+</script>
+{% endblock %}

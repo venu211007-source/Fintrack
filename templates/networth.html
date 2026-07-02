@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+{% block title %}Net Worth — FinTrack{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Net Worth</h4>
+</div>
+
+<!-- Net Worth Summary -->
+<div class="card border-0 shadow-sm mb-4 bg-gradient-primary text-white nw-hero">
+  <div class="card-body p-4">
+    <div class="row g-4 text-center">
+      <div class="col-md-4">
+        <div class="nw-stat">
+          <div class="opacity-75 small mb-1">Total Assets</div>
+          <div class="fs-3 fw-bold">{{ current_user.base_currency }} {{ '{:,.2f}'.format(total_assets) }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="nw-stat border-start border-end border-white border-opacity-25">
+          <div class="opacity-75 small mb-1">Total Liabilities</div>
+          <div class="fs-3 fw-bold text-warning">{{ current_user.base_currency }} {{ '{:,.2f}'.format(liab_total) }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="nw-stat">
+          <div class="opacity-75 small mb-1">Net Worth</div>
+          <div class="fs-3 fw-bold {% if net_worth < 0 %}text-danger{% else %}text-success-emphasis{% endif %}">
+            {{ current_user.base_currency }} {{ '{:,.2f}'.format(net_worth) }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Assets Column -->
+  <div class="col-lg-6">
+    <!-- Bank Accounts -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white border-0 pt-3 pb-0 d-flex justify-content-between">
+        <h6 class="fw-bold mb-0"><i class="bi bi-bank me-2 text-primary"></i>Bank Accounts</h6>
+        <span class="fw-semibold text-success">{{ current_user.base_currency }} {{ '{:,.2f}'.format(acc_total) }}</span>
+      </div>
+      <div class="card-body p-0">
+        {% if accounts %}
+        <ul class="list-group list-group-flush">
+          {% for acc in accounts %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-3">
+            <div>
+              <div class="fw-semibold small">{{ acc.name }}</div>
+              <div class="text-muted x-small">{{ acc.bank_name }} · {{ acc.currency }}{% if acc.country %} · {{ acc.country }}{% endif %}</div>
+            </div>
+            <span class="{% if acc.balance < 0 %}text-danger{% else %}text-success{% endif %} fw-semibold small">
+              {{ acc.currency }} {{ '{:,.2f}'.format(acc.balance) }}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted text-center py-3 small">No accounts. <a href="{{ url_for('accounts') }}">Add one</a></p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Manual Assets -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-3 pb-0 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0"><i class="bi bi-gem me-2 text-warning"></i>Other Assets</h6>
+        <div class="d-flex align-items-center gap-3">
+          <span class="fw-semibold text-success">{{ current_user.base_currency }} {{ '{:,.2f}'.format(asset_total) }}</span>
+          <button class="btn btn-sm btn-outline-primary" onclick="openAddAsset()">
+            <i class="bi bi-plus-lg"></i>
+          </button>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        {% if assets %}
+        <ul class="list-group list-group-flush" id="assetList">
+          {% for a in assets %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-3" id="asset{{ a.id }}">
+            <div>
+              <div class="fw-semibold small">{{ a.name }}</div>
+              <div class="text-muted x-small">{{ a.asset_type|title }}{% if a.description %} · {{ a.description[:30] }}{% endif %}</div>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+              <span class="text-success fw-semibold small">{{ a.currency }} {{ '{:,.2f}'.format(a.value) }}</span>
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteAsset({{ a.id }})"><i class="bi bi-trash"></i></button>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted text-center py-3 small">No assets added. Click + to add.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Liabilities Column -->
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-3 pb-0 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Liabilities</h6>
+        <div class="d-flex align-items-center gap-3">
+          <span class="fw-semibold text-danger">{{ current_user.base_currency }} {{ '{:,.2f}'.format(liab_total) }}</span>
+          <button class="btn btn-sm btn-outline-danger" onclick="openAddLiab()">
+            <i class="bi bi-plus-lg"></i>
+          </button>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        {% if liabilities %}
+        <ul class="list-group list-group-flush" id="liabList">
+          {% for l in liabilities %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-3" id="liab{{ l.id }}">
+            <div>
+              <div class="fw-semibold small">{{ l.name }}</div>
+              <div class="text-muted x-small">
+                {{ l.liability_type|title }}
+                {% if l.interest_rate %} · {{ l.interest_rate }}% p.a.{% endif %}
+                {% if l.description %} · {{ l.description[:30] }}{% endif %}
+              </div>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+              <span class="text-danger fw-semibold small">{{ l.currency }} {{ '{:,.2f}'.format(l.balance) }}</span>
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteLiab({{ l.id }})"><i class="bi bi-trash"></i></button>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted text-center py-3 small">No liabilities. Click + to add.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Asset Modal -->
+<div class="modal fade" id="assetModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-0">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Add Asset</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Asset Name</label>
+            <input type="text" id="aName" class="form-control" placeholder="e.g. Mumbai Apartment">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Type</label>
+            <select id="aType" class="form-select">
+              <option value="real_estate">Real Estate</option>
+              <option value="investment">Investments / Stocks</option>
+              <option value="vehicle">Vehicle</option>
+              <option value="gold">Gold / Jewelry</option>
+              <option value="business">Business</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Currency</label>
+            <input type="text" id="aCur" class="form-control text-uppercase" value="{{ current_user.base_currency }}" maxlength="3">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Value</label>
+            <input type="number" id="aVal" class="form-control" step="0.01" placeholder="0.00">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Notes</label>
+            <input type="text" id="aDesc" class="form-control" placeholder="Optional">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="saveAsset()">Add Asset</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Liability Modal -->
+<div class="modal fade" id="liabModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content border-0">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Add Liability</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Name</label>
+            <input type="text" id="lName" class="form-control" placeholder="e.g. Home Loan">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Type</label>
+            <select id="lType" class="form-select">
+              <option value="mortgage">Mortgage</option>
+              <option value="loan">Personal Loan</option>
+              <option value="car_loan">Car Loan</option>
+              <option value="student_loan">Student Loan</option>
+              <option value="credit_card">Credit Card</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Currency</label>
+            <input type="text" id="lCur" class="form-control text-uppercase" value="{{ current_user.base_currency }}" maxlength="3">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Balance</label>
+            <input type="number" id="lBal" class="form-control" step="0.01" placeholder="0.00">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Interest Rate (% p.a.)</label>
+            <input type="number" id="lRate" class="form-control" step="0.01" placeholder="0.00">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Notes</label>
+            <input type="text" id="lDesc" class="form-control" placeholder="Optional">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="saveLiab()">Add Liability</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function openAddAsset() { new bootstrap.Modal(document.getElementById('assetModal')).show(); }
+function openAddLiab()  { new bootstrap.Modal(document.getElementById('liabModal')).show(); }
+
+async function saveAsset() {
+  const res = await fetch('/networth/asset/add', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name:document.getElementById('aName').value,
+      value:document.getElementById('aVal').value,
+      currency:document.getElementById('aCur').value.toUpperCase(),
+      asset_type:document.getElementById('aType').value,
+      description:document.getElementById('aDesc').value })
+  });
+  if ((await res.json()).success) location.reload();
+}
+
+async function saveLiab() {
+  const res = await fetch('/networth/liability/add', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name:document.getElementById('lName').value,
+      balance:document.getElementById('lBal').value,
+      currency:document.getElementById('lCur').value.toUpperCase(),
+      liability_type:document.getElementById('lType').value,
+      interest_rate:document.getElementById('lRate').value || 0,
+      description:document.getElementById('lDesc').value })
+  });
+  if ((await res.json()).success) location.reload();
+}
+
+async function deleteAsset(id) {
+  if (!confirm('Delete this asset?')) return;
+  const res = await fetch(`/networth/asset/${id}/delete`, {method:'POST'});
+  if ((await res.json()).success) document.getElementById('asset'+id).remove();
+}
+
+async function deleteLiab(id) {
+  if (!confirm('Delete this liability?')) return;
+  const res = await fetch(`/networth/liability/${id}/delete`, {method:'POST'});
+  if ((await res.json()).success) document.getElementById('liab'+id).remove();
+}
+</script>
+{% endblock %}

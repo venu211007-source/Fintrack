@@ -1,0 +1,278 @@
+{% extends 'base.html' %}
+{% block title %}Upload Statement — FinTrack{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">Upload Bank Statement</h4>
+    <p class="text-muted mb-0 small">Supports CSV, Excel (.xlsx), and PDF files from any bank</p>
+  </div>
+</div>
+
+{% if not accounts %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle me-2"></i>
+  You need to <a href="{{ url_for('accounts') }}">add an account</a> before uploading statements.
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <!-- Step 1: Upload -->
+    <div class="card border-0 shadow-sm mb-4" id="step1Card">
+      <div class="card-header bg-white border-0 pt-3 pb-0">
+        <h6 class="fw-bold mb-0"><span class="badge bg-primary me-2">1</span>Upload File</h6>
+      </div>
+      <div class="card-body">
+        <div class="drop-zone border rounded-3 p-5 text-center" id="dropZone">
+          <i class="bi bi-cloud-upload fs-1 text-primary mb-3 d-block"></i>
+          <p class="mb-2 fw-semibold">Drag &amp; drop your bank statement here</p>
+          <p class="text-muted small mb-3">or</p>
+          <label class="btn btn-outline-primary">
+            <i class="bi bi-folder2-open me-1"></i>Browse File
+            <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.pdf" hidden>
+          </label>
+          <p class="text-muted x-small mt-3 mb-0">Supported: CSV, Excel, PDF · Max 16 MB</p>
+        </div>
+        <div id="fileInfo" class="mt-3 d-none">
+          <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3">
+            <i class="bi bi-file-earmark-text fs-3 text-primary"></i>
+            <div class="flex-grow-1">
+              <div class="fw-semibold" id="fileName"></div>
+              <div class="text-muted small" id="fileSize"></div>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="resetUpload()">
+              <i class="bi bi-x"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Column Mapping -->
+    <div class="card border-0 shadow-sm mb-4 d-none" id="step2Card">
+      <div class="card-header bg-white border-0 pt-3 pb-0">
+        <h6 class="fw-bold mb-0"><span class="badge bg-primary me-2">2</span>Map Columns</h6>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">We've auto-detected the columns below. Adjust if needed.</p>
+        <div class="row g-3" id="mappingFields">
+          <!-- populated by JS -->
+        </div>
+        <div class="mt-3">
+          <h6 class="text-muted small mb-2">Preview (first 5 rows)</h6>
+          <div class="table-responsive" id="previewTable"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Account & Import -->
+    <div class="card border-0 shadow-sm d-none" id="step3Card">
+      <div class="card-header bg-white border-0 pt-3 pb-0">
+        <h6 class="fw-bold mb-0"><span class="badge bg-primary me-2">3</span>Select Account &amp; Import</h6>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Import to Account</label>
+          <select class="form-select" id="accountSelect">
+            {% for acc in accounts %}
+            <option value="{{ acc.id }}">{{ acc.name }} ({{ acc.bank_name }}) — {{ acc.currency }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="alert alert-info small">
+          <i class="bi bi-info-circle me-2"></i>
+          Duplicate transactions (same date, amount &amp; description) will be skipped automatically.
+          Internal transfers between your accounts will be detected and flagged.
+        </div>
+        <button class="btn btn-success fw-semibold px-4" onclick="importNow()" id="importBtn">
+          <i class="bi bi-cloud-download me-2"></i>Import Transactions
+        </button>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="card border-0 shadow-sm d-none" id="resultCard">
+      <div class="card-body text-center py-4" id="resultBody"></div>
+    </div>
+  </div>
+
+  <!-- Sidebar Tips -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-3 pb-0">
+        <h6 class="fw-bold mb-0"><i class="bi bi-lightbulb me-2 text-warning"></i>Tips</h6>
+      </div>
+      <div class="card-body">
+        <ul class="list-unstyled mb-0">
+          <li class="mb-3 d-flex gap-2">
+            <i class="bi bi-check-circle-fill text-success mt-1 flex-shrink-0"></i>
+            <span class="small">Export statements from your bank's internet banking portal as <strong>CSV or Excel</strong> for best results.</span>
+          </li>
+          <li class="mb-3 d-flex gap-2">
+            <i class="bi bi-check-circle-fill text-success mt-1 flex-shrink-0"></i>
+            <span class="small">The app auto-detects common column names (Date, Amount, Debit, Credit, Description). You can adjust if needed.</span>
+          </li>
+          <li class="mb-3 d-flex gap-2">
+            <i class="bi bi-check-circle-fill text-success mt-1 flex-shrink-0"></i>
+            <span class="small"><strong>Internal transfers</strong> between your own accounts are detected automatically and excluded from income/expense totals.</span>
+          </li>
+          <li class="mb-3 d-flex gap-2">
+            <i class="bi bi-check-circle-fill text-success mt-1 flex-shrink-0"></i>
+            <span class="small">For <strong>multi-currency</strong> accounts, set exchange rates in <a href="{{ url_for('settings') }}">Settings</a> to see consolidated totals.</span>
+          </li>
+          <li class="d-flex gap-2">
+            <i class="bi bi-check-circle-fill text-success mt-1 flex-shrink-0"></i>
+            <span class="small">You can also add transactions manually from the <a href="{{ url_for('transactions') }}">Transactions</a> page.</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+let uploadedFilepath = null;
+let allColumns = [];
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+function handleFile(file) {
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileSize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+  document.getElementById('fileInfo').classList.remove('d-none');
+  dropZone.classList.add('d-none');
+  uploadFile(file);
+}
+
+function resetUpload() {
+  uploadedFilepath = null;
+  fileInput.value = '';
+  document.getElementById('fileInfo').classList.add('d-none');
+  dropZone.classList.remove('d-none');
+  document.getElementById('step2Card').classList.add('d-none');
+  document.getElementById('step3Card').classList.add('d-none');
+  document.getElementById('resultCard').classList.add('d-none');
+}
+
+async function uploadFile(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  dropZone.innerHTML = '<div class="py-3"><div class="spinner-border text-primary mb-2"></div><p class="text-muted">Analysing file…</p></div>';
+
+  try {
+    const res = await fetch('/upload/preview', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    uploadedFilepath = data.filepath;
+    allColumns = data.columns;
+    buildMappingUI(data.columns, data.mapping, data.preview);
+    document.getElementById('step2Card').classList.remove('d-none');
+    document.getElementById('step3Card').classList.remove('d-none');
+  } catch(e) {
+    alert('Error: ' + e.message);
+    resetUpload();
+  }
+}
+
+function buildMappingUI(cols, mapping, preview) {
+  const opts = ['<option value="">(none)</option>', ...cols.map(c => `<option value="${c}">${c}</option>`)].join('');
+  const fields = [
+    ['date', 'Date Column', mapping.date],
+    ['description', 'Description Column', mapping.description],
+    ['debit', 'Debit / Withdrawal Column', mapping.debit],
+    ['credit', 'Credit / Deposit Column', mapping.credit],
+    ['amount', 'Amount Column (single)', mapping.amount],
+  ];
+
+  document.getElementById('mappingFields').innerHTML = fields.map(([key, label, val]) => `
+    <div class="col-md-6">
+      <label class="form-label small fw-semibold">${label}</label>
+      <select class="form-select form-select-sm" id="map_${key}">
+        ${opts.replace(`value="${val}"`, `value="${val}" selected`)}
+      </select>
+    </div>
+  `).join('');
+
+  if (preview && preview.length) {
+    const headers = Object.keys(preview[0]);
+    const tableHtml = `<table class="table table-sm table-bordered small">
+      <thead class="table-light"><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${preview.map(row => `<tr>${headers.map(h => `<td>${row[h]||''}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>`;
+    document.getElementById('previewTable').innerHTML = tableHtml;
+  }
+}
+
+function getMapping() {
+  return {
+    date: document.getElementById('map_date')?.value || null,
+    description: document.getElementById('map_description')?.value || null,
+    debit: document.getElementById('map_debit')?.value || null,
+    credit: document.getElementById('map_credit')?.value || null,
+    amount: document.getElementById('map_amount')?.value || null,
+  };
+}
+
+async function importNow() {
+  const accountId = document.getElementById('accountSelect').value;
+  if (!accountId) { alert('Please select an account.'); return; }
+
+  const btn = document.getElementById('importBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Importing…';
+
+  try {
+    const res = await fetch('/upload/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filepath: uploadedFilepath,
+        account_id: parseInt(accountId),
+        column_mapping: getMapping()
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('resultCard').classList.remove('d-none');
+    document.getElementById('resultBody').innerHTML = `
+      <i class="bi bi-check-circle-fill text-success fs-1 mb-3 d-block"></i>
+      <h5 class="fw-bold">Import Complete!</h5>
+      <p class="text-muted">${data.imported} transactions imported · ${data.skipped} duplicates skipped</p>
+      <p class="text-muted small mb-3">Redirecting to dashboard in <span id="countdown" class="fw-bold text-primary">3</span>s…</p>
+      <a href="/dashboard" class="btn btn-primary me-2"><i class="bi bi-speedometer2 me-1"></i>Go to Dashboard</a>
+      <button class="btn btn-outline-secondary" onclick="window._cancelRedirect()">Upload Another</button>`;
+    document.getElementById('step2Card').classList.add('d-none');
+    document.getElementById('step3Card').classList.add('d-none');
+
+    let secs = 3;
+    let redirectTimer = setInterval(() => {
+      secs--;
+      const el = document.getElementById('countdown');
+      if (el) el.textContent = secs;
+      if (secs <= 0) { clearInterval(redirectTimer); window.location.href = '/dashboard'; }
+    }, 1000);
+
+    window._cancelRedirect = () => { clearInterval(redirectTimer); resetUpload(); };
+  } catch(e) {
+    alert('Import failed: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-cloud-download me-2"></i>Import Transactions';
+  }
+}
+</script>
+{% endblock %}
