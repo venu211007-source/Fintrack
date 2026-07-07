@@ -58,6 +58,7 @@ _BANK_SIGNATURES = {
     'pnb':       re.compile(r'PUNJAB\s*NATIONAL\s*BANK', re.IGNORECASE),
     'bob':       re.compile(r'BANK\s*OF\s*BARODA', re.IGNORECASE),
     'canara':    re.compile(r'CANARA\s*BANK', re.IGNORECASE),
+    'dbs':       re.compile(r'\bDBS\s*BANK|\bDBS\s*TREASURES|\bDevelopment\s*Bank\s*of\s*Singapore', re.IGNORECASE),
     # European banks
     'deutsche':  re.compile(r'DEUTSCHE\s*BANK|DB\s*PRIVAT', re.IGNORECASE),
     'barclays':  re.compile(r'BARCLAYS', re.IGNORECASE),
@@ -457,9 +458,11 @@ def _read_pdf(filepath):
         err_name = type(open_err).__name__
         if 'password' in err_name.lower() or 'password' in str(open_err).lower() or not str(open_err):
             raise ValueError(
-                "This PDF is password-protected. Open it with the password your bank sent "
-                "(usually your date of birth or account number), then save as a new PDF, or "
-                "download the statement as CSV instead."
+                "This PDF is password-protected. "
+                "DBS/POSB password is usually your date of birth (DDMMYYYY). "
+                "ICICI password is usually your date of birth (DDMMYYYY). "
+                "Open the PDF in Chrome or Adobe, enter the password, then print/save as a new PDF — "
+                "or download the statement as CSV from your bank's internet banking."
             )
         raise ValueError(f"Could not open PDF: {open_err or err_name}")
 
