@@ -449,9 +449,19 @@ def _read_pdf(filepath):
     import pdfplumber
 
     # Detect bank from first-page text
-    with pdfplumber.open(filepath) as pdf:
-        first_text = pdf.pages[0].extract_text() or '' if pdf.pages else ''
-        first_tables = pdf.pages[0].extract_tables() if pdf.pages else []
+    try:
+        with pdfplumber.open(filepath) as pdf:
+            first_text = pdf.pages[0].extract_text() or '' if pdf.pages else ''
+            first_tables = pdf.pages[0].extract_tables() if pdf.pages else []
+    except Exception as open_err:
+        err_name = type(open_err).__name__
+        if 'password' in err_name.lower() or 'password' in str(open_err).lower() or not str(open_err):
+            raise ValueError(
+                "This PDF is password-protected. Open it with the password your bank sent "
+                "(usually your date of birth or account number), then save as a new PDF, or "
+                "download the statement as CSV instead."
+            )
+        raise ValueError(f"Could not open PDF: {open_err or err_name}")
 
     bank = _detect_bank(first_text)
 

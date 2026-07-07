@@ -175,7 +175,12 @@ async function uploadFile(file) {
   try {
     const res = await fetch('/upload/preview', { method: 'POST', body: fd });
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Could not parse this file. It may be password-protected or in an unsupported format. Try downloading as CSV from your bank.');
+    }
+    if (!data.columns || !Array.isArray(data.columns) || data.columns.length === 0) {
+      throw new Error('No columns found in this file. Please try a CSV or Excel export from your bank.');
+    }
 
     uploadedFilepath = data.filepath;
     allColumns = data.columns;

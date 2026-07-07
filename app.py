@@ -417,9 +417,12 @@ def upload_preview():
         preview['filepath'] = fpath
         return jsonify(preview)
     except Exception as e:
+        import traceback
+        print(f"[upload_preview] parse error:\n{traceback.format_exc()}", flush=True)
         if os.path.exists(fpath):
             os.remove(fpath)
-        return jsonify({'error': str(e)}), 400
+        msg = str(e) or 'Could not read this PDF. It may be password-protected or in an unsupported format. Try downloading the statement as CSV from your bank.'
+        return jsonify({'error': msg}), 400
 
 
 @app.route('/upload/import', methods=['POST'])
