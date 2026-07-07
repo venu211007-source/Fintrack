@@ -442,7 +442,11 @@ def import_transactions():
 
     try:
         df, mapping = parse_bank_statement(fpath, col_map)
+        print(f"[import] cols={list(df.columns)} mapping={mapping} rows={len(df)}", flush=True)
+        if len(df):
+            print(f"[import] first row sample: {df.iloc[0].to_dict()}", flush=True)
         rows = process_transactions(df, mapping)
+        print(f"[import] process_transactions → {len(rows)} valid rows", flush=True)
 
         imported = 0
         skipped = 0

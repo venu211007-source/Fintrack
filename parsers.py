@@ -88,7 +88,9 @@ def clean_amount(val):
     s = str(val).strip()
     if not s or s in ['-', 'nan', 'NaN', '']:
         return None
+    s = ' '.join(s.split())          # collapse internal whitespace / newlines
     s = re.sub(r'[£$€₹¥₩₦₿\s]', '', s)
+    s = re.sub(r'^[A-Za-z]+', '', s) # strip currency codes like S, SGD, INR, USD
     negative = False
     if s.startswith('(') and s.endswith(')'):
         negative = True
@@ -119,6 +121,7 @@ def parse_date_val(val, dayfirst=True):
         s = str(val).strip()
         if not s or s in ['nan', 'NaN', '']:
             return None
+        s = ' '.join(s.split())  # collapse newlines / multiple spaces from PDF cells
         # Handle German date format: DD.MM.YYYY
         if re.match(r'^\d{1,2}\.\d{1,2}\.\d{2,4}$', s):
             parts = s.split('.')
