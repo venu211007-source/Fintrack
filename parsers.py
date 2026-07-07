@@ -349,7 +349,7 @@ def _parse_compressed_pdf(filepath):
 def _read_pdf_generic(filepath):
     """
     Standard row-per-transaction PDF parser.
-    Works for SBI, ICICI, Axis, Kotak, Yes Bank, IndusInd, and most
+    Works for SBI, ICICI, Axis, Kotak, DBS, Yes Bank, IndusInd, and most
     international banks whose statements have one row per transaction.
     """
     import pdfplumber
@@ -364,21 +364,28 @@ def _read_pdf_generic(filepath):
                 if not table:
                     continue
 
-                first_row = [str(h or '').lower().strip() for h in table[0]]
-                has_date  = any('date' in h for h in first_row)
-                has_val   = any(k in h for h in first_row
-                                for k in ['amount', 'debit', 'credit',
-                                          'withdrawal', 'deposit', 'dr', 'cr'])
+                # Search through the first few rows for a real header row.
+                # Skip single-cell merged title rows (e.g. DBS "Transaction Details").
+                found_header = False
+                for row_idx, row in enumerate(table[:6]):
+                    if not row or len(row) <= 1:
+                        continue
+                    row_lower = [str(h or '').lower().strip() for h in row]
+                    has_date = any('date' in h for h in row_lower)
+                    has_val  = any(k in h for h in row_lower
+                                   for k in ['amount', 'debit', 'credit',
+                                             'withdrawal', 'deposit', 'dr', 'cr'])
+                    if has_date and has_val:
+                        if headers is None:
+                            headers = row
+                            n_cols  = len(row)
+                        all_rows.extend(r for r in table[row_idx + 1:] if r and len(r) == n_cols)
+                        found_header = True
+                        break
 
-                if has_date and has_val:
-                    # Header row found — record it and add data rows
-                    if headers is None:
-                        headers = table[0]
-                        n_cols  = len(headers)
-                    all_rows.extend(table[1:])
-                elif headers is not None and table[0] and len(table[0]) == n_cols:
-                    # Subsequent page without a repeated header — add all rows
-                    all_rows.extend(table)
+                if not found_header and headers is not None:
+                    # Subsequent page without a repeated header — add matching rows
+                    all_rows.extend(r for r in table if r and len(r) == n_cols)
 
     if all_rows and headers:
         df = pd.DataFrame(all_rows, columns=headers)
