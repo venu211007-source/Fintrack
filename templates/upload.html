@@ -174,7 +174,16 @@ async function uploadFile(file) {
 
   try {
     const res = await fetch('/upload/preview', { method: 'POST', body: fd });
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (_) {
+      // Server returned HTML (likely the login page after session expiry)
+      if (res.redirected || res.url.includes('/login')) {
+        throw new Error('Your session expired. Please refresh the page and log in again.');
+      }
+      throw new Error('Server returned an unexpected response. Please refresh the page and try again.');
+    }
     if (!res.ok || data.error) {
       throw new Error(data.error || 'Could not parse this file. It may be password-protected or in an unsupported format. Try downloading as CSV from your bank.');
     }
