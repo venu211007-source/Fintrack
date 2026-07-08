@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinTrack — Personal Finance Dashboard for Every Bank</title>
+  <meta name="description" content="Upload any bank statement and instantly see where your money goes. Supports HDFC, ICICI, SBI, DBS, Deutsche Bank, Chase, and 30+ banks worldwide.">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0f1a2e">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root { --dark: #0f1a2e; --accent: #0d6efd; }
+    body { font-family: 'Inter','Segoe UI',system-ui,sans-serif; margin: 0; }
+
+    /* NAV */
+    .land-nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,26,46,0.97);
+      backdrop-filter: blur(8px);
+      padding: 0.75rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .land-nav .brand { color: #fff; font-weight: 800; font-size: 1.2rem; text-decoration: none; }
+    .land-nav .brand i { color: #60a5fa; }
+    .nav-ctas { display: flex; gap: 0.5rem; }
+    .btn-nav-login  { color: #cbd5e1; background: transparent; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 0.4rem 1rem; text-decoration: none; font-size: 0.9rem; }
+    .btn-nav-signup { color: #fff; background: var(--accent); border: none; border-radius: 8px; padding: 0.4rem 1.1rem; text-decoration: none; font-size: 0.9rem; font-weight: 600; }
+    .btn-nav-login:hover  { border-color: #fff; color: #fff; }
+    .btn-nav-signup:hover { background: #0b5ed7; }
+
+    /* HERO */
+    .hero {
+      background: linear-gradient(135deg, #0f1a2e 0%, #1a3a6e 60%, #1e40af 100%);
+      color: white; padding: 5rem 1.5rem 4rem; text-align: center;
+    }
+    .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 900; line-height: 1.15; margin-bottom: 1.25rem; }
+    .hero h1 span { color: #60a5fa; }
+    .hero p.lead { font-size: clamp(1rem, 2.5vw, 1.2rem); color: #94a3b8; max-width: 560px; margin: 0 auto 2rem; }
+    .hero-ctas { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 3rem; }
+    .btn-hero-primary { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 0.8rem 2rem; font-size: 1.05rem; font-weight: 700; text-decoration: none; }
+    .btn-hero-primary:hover { background: #0b5ed7; color: #fff; }
+    .btn-hero-ghost { background: transparent; color: #cbd5e1; border: 1.5px solid rgba(255,255,255,0.3); border-radius: 10px; padding: 0.8rem 2rem; font-size: 1.05rem; font-weight: 600; text-decoration: none; }
+    .btn-hero-ghost:hover { border-color: #fff; color: #fff; }
+
+    /* BANK LOGOS STRIP */
+    .banks-strip { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; justify-content: center; align-items: center; margin-bottom: 0.5rem; }
+    .bank-chip { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; padding: 0.25rem 0.85rem; font-size: 0.8rem; color: #94a3b8; }
+    .banks-label { color: #64748b; font-size: 0.78rem; margin-bottom: 1rem; }
+
+    /* DASHBOARD PREVIEW */
+    .preview-wrap {
+      max-width: 900px; margin: 0 auto;
+      background: #1e293b; border-radius: 16px; overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+    }
+    .preview-bar {
+      background: #0f172a; padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.4rem;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-r { background: #ef4444; } .dot-y { background: #f59e0b; } .dot-g { background: #22c55e; }
+    .preview-bar span { color: #64748b; font-size: 0.75rem; margin-left: 0.5rem; }
+    .preview-body { padding: 1.25rem; display: grid; gap: 0.75rem; }
+
+    /* Mini KPI row inside preview */
+    .mini-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
+    @media(max-width:560px) { .mini-kpis { grid-template-columns: repeat(2, 1fr); } }
+    .mini-kpi { background: #0f172a; border-radius: 10px; padding: 0.75rem; }
+    .mini-kpi .label { color: #64748b; font-size: 0.7rem; margin-bottom: 0.2rem; }
+    .mini-kpi .val  { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; }
+    .mini-kpi .val.green { color: #4ade80; }
+    .mini-kpi .val.red   { color: #f87171; }
+    .mini-kpi .val.blue  { color: #60a5fa; }
+
+    /* Mini chart bars */
+    .mini-chart { background: #0f172a; border-radius: 10px; padding: 0.75rem; }
+    .mini-chart .chart-label { color: #64748b; font-size: 0.7rem; margin-bottom: 0.5rem; }
+    .bars { display: flex; align-items: flex-end; gap: 4px; height: 48px; }
+    .bar-g { background: #22c55e; border-radius: 3px 3px 0 0; flex: 1; opacity: 0.8; }
+    .bar-r { background: #ef4444; border-radius: 3px 3px 0 0; flex: 1; opacity: 0.8; }
+
+    /* Mini transaction list */
+    .mini-txns { background: #0f172a; border-radius: 10px; padding: 0.75rem; }
+    .mini-txns .chart-label { color: #64748b; font-size: 0.7rem; margin-bottom: 0.4rem; }
+    .mini-txn { display: flex; justify-content: space-between; align-items: center; padding: 0.35rem 0; border-bottom: 1px solid #1e293b; font-size: 0.75rem; }
+    .mini-txn:last-child { border-bottom: none; }
+    .mini-txn .desc { color: #94a3b8; }
+    .mini-txn .amt  { font-weight: 700; }
+    .mini-txn .amt.neg { color: #f87171; }
+    .mini-txn .amt.pos { color: #4ade80; }
+
+    /* FEATURES */
+    .features { padding: 5rem 1.5rem; background: #f8faff; }
+    .features h2 { text-align: center; font-weight: 800; font-size: clamp(1.6rem,4vw,2.4rem); color: #0f1a2e; margin-bottom: 0.5rem; }
+    .features .sub { text-align: center; color: #64748b; margin-bottom: 3.5rem; }
+    .feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; max-width: 1100px; margin: 0 auto; }
+    .feat-card { background: #fff; border-radius: 16px; padding: 1.75rem; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+    .feat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 1rem; }
+    .feat-card h4 { font-weight: 700; font-size: 1rem; margin-bottom: 0.4rem; color: #0f1a2e; }
+    .feat-card p  { font-size: 0.88rem; color: #64748b; margin: 0; line-height: 1.6; }
+
+    /* HOW IT WORKS */
+    .how { padding: 5rem 1.5rem; background: #fff; }
+    .how h2 { text-align: center; font-weight: 800; font-size: clamp(1.6rem,4vw,2.4rem); color: #0f1a2e; margin-bottom: 0.5rem; }
+    .how .sub { text-align: center; color: #64748b; margin-bottom: 3.5rem; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 2rem; max-width: 900px; margin: 0 auto; }
+    .step { text-align: center; }
+    .step-num { width: 56px; height: 56px; background: linear-gradient(135deg,#0d6efd,#6610f2); border-radius: 50%; color: #fff; font-size: 1.3rem; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
+    .step h4 { font-weight: 700; color: #0f1a2e; font-size: 1rem; margin-bottom: 0.4rem; }
+    .step p  { font-size: 0.85rem; color: #64748b; margin: 0; }
+
+    /* BANKS */
+    .banks-section { padding: 4rem 1.5rem; background: #f8faff; text-align: center; }
+    .banks-section h2 { font-weight: 800; font-size: clamp(1.4rem,3vw,2rem); color: #0f1a2e; margin-bottom: 0.5rem; }
+    .banks-section .sub { color: #64748b; margin-bottom: 2rem; }
+    .bank-pills { display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; max-width: 800px; margin: 0 auto; }
+    .bank-pill { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 20px; padding: 0.4rem 1rem; font-size: 0.82rem; color: #475569; font-weight: 500; }
+
+    /* CTA BANNER */
+    .cta-banner { padding: 5rem 1.5rem; background: linear-gradient(135deg,#0f1a2e,#1a3a6e,#1e40af); text-align: center; color: #fff; }
+    .cta-banner h2 { font-weight: 800; font-size: clamp(1.6rem,4vw,2.5rem); margin-bottom: 0.75rem; }
+    .cta-banner p  { color: #94a3b8; margin-bottom: 2rem; }
+
+    /* FOOTER */
+    footer { background: #0f172a; color: #64748b; text-align: center; padding: 2rem 1.5rem; font-size: 0.82rem; }
+    footer a { color: #94a3b8; text-decoration: none; }
+    footer a:hover { color: #fff; }
+    footer .foot-links { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="land-nav">
+  <a class="brand" href="/"><i class="bi bi-bank2 me-1"></i>FinTrack</a>
+  <div class="nav-ctas">
+    <a href="{{ url_for('login') }}" class="btn-nav-login">Sign In</a>
+    <a href="{{ url_for('register') }}" class="btn-nav-signup">Get Started Free</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <h1>Know exactly where your<br><span>money goes</span></h1>
+  <p class="lead">Upload any bank statement and get instant analytics — spending by category, income vs expenses, net worth, and more.</p>
+  <div class="hero-ctas">
+    <a href="{{ url_for('register') }}" class="btn-hero-primary"><i class="bi bi-lightning-charge-fill me-1"></i>Start for Free</a>
+    <a href="{{ url_for('login') }}" class="btn-hero-ghost">I already have an account</a>
+  </div>
+  <p class="banks-label">Works with statements from</p>
+  <div class="banks-strip">
+    <span class="bank-chip">HDFC Bank</span>
+    <span class="bank-chip">ICICI Bank</span>
+    <span class="bank-chip">SBI</span>
+    <span class="bank-chip">Axis Bank</span>
+    <span class="bank-chip">DBS Bank</span>
+    <span class="bank-chip">Deutsche Bank</span>
+    <span class="bank-chip">Chase</span>
+    <span class="bank-chip">Bank of America</span>
+    <span class="bank-chip">Wells Fargo</span>
+    <span class="bank-chip">+ 25 more</span>
+  </div>
+
+  <!-- Dashboard mock -->
+  <div class="preview-wrap mt-4">
+    <div class="preview-bar">
+      <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+      <span>fintrack · Dashboard</span>
+    </div>
+    <div class="preview-body">
+      <div class="mini-kpis">
+        <div class="mini-kpi"><div class="label">Income</div><div class="val green">₹ 85,400</div></div>
+        <div class="mini-kpi"><div class="label">Expenses</div><div class="val red">₹ 51,230</div></div>
+        <div class="mini-kpi"><div class="label">Saved</div><div class="val blue">₹ 34,170</div></div>
+        <div class="mini-kpi"><div class="label">Net Worth</div><div class="val">₹ 3.2L</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div class="mini-chart">
+          <div class="chart-label">Income vs Expenses — Last 6 Months</div>
+          <div class="bars">
+            <div class="bar-g" style="height:60%"></div><div class="bar-r" style="height:45%"></div>
+            <div class="bar-g" style="height:70%"></div><div class="bar-r" style="height:55%"></div>
+            <div class="bar-g" style="height:80%"></div><div class="bar-r" style="height:40%"></div>
+            <div class="bar-g" style="height:65%"></div><div class="bar-r" style="height:50%"></div>
+            <div class="bar-g" style="height:90%"></div><div class="bar-r" style="height:60%"></div>
+            <div class="bar-g" style="height:100%"></div><div class="bar-r" style="height:65%"></div>
+          </div>
+        </div>
+        <div class="mini-txns">
+          <div class="chart-label">Recent Transactions</div>
+          <div class="mini-txn"><span class="desc">Swiggy</span><span class="amt neg">-₹350</span></div>
+          <div class="mini-txn"><span class="desc">Salary</span><span class="amt pos">+₹75,000</span></div>
+          <div class="mini-txn"><span class="desc">Spotify</span><span class="amt neg">-₹119</span></div>
+          <div class="mini-txn"><span class="desc">Amazon</span><span class="amt neg">-₹1,299</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <h2>Everything you need to understand your finances</h2>
+  <p class="sub">No bank login. No data sharing. Your statements, your device, your privacy.</p>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#dbeafe;color:#1d4ed8"><i class="bi bi-file-earmark-arrow-up"></i></div>
+      <h4>Upload Any Statement</h4>
+      <p>PDF, CSV, or Excel from any bank. Auto-detects columns and maps them correctly — no manual setup needed.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#dcfce7;color:#15803d"><i class="bi bi-tags"></i></div>
+      <h4>Auto-Categorisation</h4>
+      <p>Transactions are instantly sorted into Food, Shopping, Travel, Utilities, and 12 other categories automatically.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#fef9c3;color:#a16207"><i class="bi bi-bar-chart-line"></i></div>
+      <h4>Spending Analytics</h4>
+      <p>See where money goes each month with charts breaking down income vs expenses and category-wise spending.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#fce7f3;color:#be185d"><i class="bi bi-wallet2"></i></div>
+      <h4>Multi-Account</h4>
+      <p>Add all your bank accounts — savings, current, credit cards. See your consolidated net worth in one view.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#ede9fe;color:#7c3aed"><i class="bi bi-currency-exchange"></i></div>
+      <h4>Multi-Currency</h4>
+      <p>Have accounts in INR, SGD, USD, EUR? Set exchange rates and see everything in your base currency.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:#ffedd5;color:#c2410c"><i class="bi bi-shield-lock"></i></div>
+      <h4>Private by Design</h4>
+      <p>Your data never leaves your account. No third-party bank connections. No selling your financial data. Ever.</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how">
+  <h2>Up and running in 3 steps</h2>
+  <p class="sub">No configuration. No bank credentials. No waiting.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h4>Create a free account</h4>
+      <p>Sign up with your email. Takes under 30 seconds.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h4>Upload your statement</h4>
+      <p>Download a PDF or CSV from your bank's internet banking and upload it here.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h4>See your finances clearly</h4>
+      <p>Instant charts, category breakdown, and spending trends — no manual data entry.</p>
+    </div>
+  </div>
+</section>
+
+<!-- BANKS -->
+<section class="banks-section">
+  <h2>Works with 30+ banks worldwide</h2>
+  <p class="sub">Indian, European, and US banks — PDF and CSV both supported.</p>
+  <div class="bank-pills">
+    <span class="bank-pill">HDFC Bank</span>
+    <span class="bank-pill">ICICI Bank</span>
+    <span class="bank-pill">State Bank of India</span>
+    <span class="bank-pill">Axis Bank</span>
+    <span class="bank-pill">Kotak Mahindra</span>
+    <span class="bank-pill">Yes Bank</span>
+    <span class="bank-pill">IndusInd Bank</span>
+    <span class="bank-pill">Federal Bank</span>
+    <span class="bank-pill">IDFC First Bank</span>
+    <span class="bank-pill">Punjab National Bank</span>
+    <span class="bank-pill">DBS Bank</span>
+    <span class="bank-pill">Deutsche Bank</span>
+    <span class="bank-pill">HSBC</span>
+    <span class="bank-pill">Barclays</span>
+    <span class="bank-pill">Chase</span>
+    <span class="bank-pill">Bank of America</span>
+    <span class="bank-pill">Wells Fargo</span>
+    <span class="bank-pill">Citi</span>
+    <span class="bank-pill">Capital One</span>
+    <span class="bank-pill">American Express</span>
+    <span class="bank-pill">+ Any CSV export</span>
+  </div>
+</section>
+
+<!-- CTA BANNER -->
+<section class="cta-banner">
+  <h2>Start understanding your money today</h2>
+  <p>Free. No credit card. No bank login required.</p>
+  <a href="{{ url_for('register') }}" class="btn-hero-primary" style="font-size:1.1rem;padding:0.9rem 2.5rem">
+    <i class="bi bi-lightning-charge-fill me-1"></i>Create Free Account
+  </a>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-links">
+    <a href="{{ url_for('login') }}">Sign In</a>
+    <a href="{{ url_for('register') }}">Sign Up</a>
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/terms">Terms of Service</a>
+  </div>
+  <div>© 2026 FinTrack. Built for people who want to understand their money.</div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Privacy Policy — FinTrack{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm p-4 p-md-5">
+      <h2 class="fw-bold mb-1">Privacy Policy</h2>
+      <p class="text-muted small mb-4">Last updated: July 2026</p>
+
+      <p>FinTrack is designed with privacy as a core principle. Your financial data belongs to you.</p>
+
+      <h5 class="fw-bold mt-4">What we collect</h5>
+      <ul>
+        <li>Your name and email address (for your account)</li>
+        <li>Bank statement data you upload (transactions, amounts, dates)</li>
+        <li>Account information you manually enter (bank name, currency)</li>
+      </ul>
+
+      <h5 class="fw-bold mt-4">What we do NOT do</h5>
+      <ul>
+        <li>We do <strong>not</strong> sell your data to any third party</li>
+        <li>We do <strong>not</strong> connect to your bank directly</li>
+        <li>We do <strong>not</strong> share your financial information with advertisers</li>
+        <li>We do <strong>not</strong> use your data for any purpose other than showing it back to you</li>
+      </ul>
+
+      <h5 class="fw-bold mt-4">How your data is stored</h5>
+      <p>Your data is stored in a secure PostgreSQL database hosted on Railway (US West). Uploaded statement files are processed immediately and deleted from the server — only the extracted transaction records are saved to your account.</p>
+
+      <h5 class="fw-bold mt-4">Security</h5>
+      <p>Passwords are hashed using industry-standard bcrypt. All connections use HTTPS encryption. We do not store your bank credentials or passwords.</p>
+
+      <h5 class="fw-bold mt-4">Deleting your data</h5>
+      <p>You can delete your account and all associated data at any time from Settings. Contact us at the email below if you need assistance.</p>
+
+      <h5 class="fw-bold mt-4">Contact</h5>
+      <p>Questions about your data? Email: <a href="mailto:venugopalan211007@gmail.com">venugopalan211007@gmail.com</a></p>
+
+      <div class="mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to Home</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

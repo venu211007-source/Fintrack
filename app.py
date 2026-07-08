@@ -177,7 +177,19 @@ def month_summary(user, month, year):
 
 @app.route('/')
 def index():
-    return redirect(url_for('dashboard') if current_user.is_authenticated else url_for('login'))
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    return render_template('landing.html')
+
+
+@app.route('/privacy')
+def privacy():
+    return render_template('privacy.html')
+
+
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -417,8 +429,6 @@ def upload_preview():
         preview['filepath'] = fpath
         return jsonify(preview)
     except Exception as e:
-        import traceback
-        print(f"[upload_preview] parse error:\n{traceback.format_exc()}", flush=True)
         if os.path.exists(fpath):
             os.remove(fpath)
         msg = str(e) or 'Could not read this PDF. It may be password-protected or in an unsupported format. Try downloading the statement as CSV from your bank.'
@@ -442,11 +452,7 @@ def import_transactions():
 
     try:
         df, mapping = parse_bank_statement(fpath, col_map)
-        print(f"[import] cols={list(df.columns)} mapping={mapping} rows={len(df)}", flush=True)
-        if len(df):
-            print(f"[import] first row sample: {df.iloc[0].to_dict()}", flush=True)
         rows = process_transactions(df, mapping)
-        print(f"[import] process_transactions → {len(rows)} valid rows", flush=True)
 
         imported = 0
         skipped = 0

@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Terms of Service — FinTrack{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm p-4 p-md-5">
+      <h2 class="fw-bold mb-1">Terms of Service</h2>
+      <p class="text-muted small mb-4">Last updated: July 2026</p>
+
+      <p>By using FinTrack, you agree to these terms. Please read them carefully.</p>
+
+      <h5 class="fw-bold mt-4">1. Use of the Service</h5>
+      <p>FinTrack is a personal finance tracking tool. You may use it to upload and analyse your own bank statements. You may not use FinTrack to process financial data belonging to others without their permission.</p>
+
+      <h5 class="fw-bold mt-4">2. Your Account</h5>
+      <p>You are responsible for keeping your login credentials secure. Each account is for personal use. Do not share your account with others.</p>
+
+      <h5 class="fw-bold mt-4">3. Your Data</h5>
+      <p>You own your data. By uploading a bank statement, you grant FinTrack permission to process and store the extracted transaction data for the purpose of displaying it to you. We do not use your data for any other purpose.</p>
+
+      <h5 class="fw-bold mt-4">4. Accuracy</h5>
+      <p>FinTrack uses automated parsing to read bank statements. While we strive for accuracy, we cannot guarantee that all transactions are parsed correctly. Always verify important financial information with your bank directly. FinTrack is not a substitute for professional financial advice.</p>
+
+      <h5 class="fw-bold mt-4">5. Availability</h5>
+      <p>We aim to keep FinTrack available at all times but cannot guarantee uninterrupted service. We reserve the right to update or modify the service at any time.</p>
+
+      <h5 class="fw-bold mt-4">6. Limitation of Liability</h5>
+      <p>FinTrack is provided "as is". We are not liable for any financial decisions made based on information displayed in the app.</p>
+
+      <h5 class="fw-bold mt-4">7. Contact</h5>
+      <p>Questions? Email: <a href="mailto:venugopalan211007@gmail.com">venugopalan211007@gmail.com</a></p>
+
+      <div class="mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to Home</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

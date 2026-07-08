@@ -135,8 +135,52 @@ body {
 /* Modal */
 .modal-content { border-radius: 16px !important; }
 
+/* ── Mobile bottom navigation ─────────────────────────────────────── */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 60px;
+  background: var(--dark-blue);
+  display: flex;
+  align-items: stretch;
+  z-index: 1050;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.25);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.mbn-item {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.5);
+  text-decoration: none;
+  font-size: 0.62rem;
+  gap: 2px;
+  transition: color 0.15s;
+}
+.mbn-item i    { font-size: 1.25rem; }
+.mbn-item span { line-height: 1; }
+.mbn-item.active { color: #60a5fa; }
+.mbn-item:hover  { color: rgba(255,255,255,0.85); }
+
+.mbn-upload {
+  color: #fff;
+  background: #0d6efd;
+  border-radius: 14px;
+  margin: 6px 4px;
+  flex: 1.2;
+}
+.mbn-upload.active, .mbn-upload:hover { color: #fff; background: #0b5ed7; }
+
+/* Add bottom padding on mobile so content isn't hidden behind the nav */
+@media (max-width: 991px) {
+  .main-with-bottom-nav { padding-bottom: calc(60px + env(safe-area-inset-bottom) + 1rem) !important; }
+}
+
 /* Responsive tweaks */
 @media (max-width: 768px) {
   .auth-card { width: 95vw !important; }
   .container-fluid { padding-left: 12px !important; padding-right: 12px !important; }
+  /* Tighten KPI numbers on small screens */
+  .fw-bold.fs-5 { font-size: 1rem !important; }
+  .kpi-icon { width: 38px; height: 38px; }
+  .kpi-icon i { font-size: 1.1rem !important; }
 }
