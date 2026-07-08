@@ -349,26 +349,28 @@ def _parse_compressed_pdf(filepath):
 
 # ── generic PDF parser (SBI / ICICI / Axis / Kotak / most banks) ───────────
 
-def _read_pdf_generic(filepath):
-    """
-    Standard row-per-transaction PDF parser.
-    Works for SBI, ICICI, Axis, Kotak, DBS, Yes Bank, IndusInd, and most
-    international banks whose statements have one row per transaction.
-    """
-    import pdfplumber
+def _looks_compressed(rows):
+    """Return True if cells contain multiple newlines — pdfplumber merged rows into one."""
+    for row in rows[:5]:
+        for cell in (row or []):
+            if cell and str(cell).count('\n') > 2:
+                return True
+    return False
 
+
+def _extract_tables_from_pdf(filepath, table_settings=None):
+    """Extract (all_rows, headers, n_cols) from all pages using given pdfplumber settings."""
+    import pdfplumber
     all_rows = []
     headers  = None
     n_cols   = None
+    kw = {'table_settings': table_settings} if table_settings else {}
 
     with pdfplumber.open(filepath) as pdf:
         for page in pdf.pages:
-            for table in (page.extract_tables() or []):
+            for table in (page.extract_tables(**kw) or []):
                 if not table:
                     continue
-
-                # Search through the first few rows for a real header row.
-                # Skip single-cell merged title rows (e.g. DBS "Transaction Details").
                 found_header = False
                 for row_idx, row in enumerate(table[:6]):
                     if not row or len(row) <= 1:
@@ -385,10 +387,33 @@ def _read_pdf_generic(filepath):
                         all_rows.extend(r for r in table[row_idx + 1:] if r and len(r) == n_cols)
                         found_header = True
                         break
-
                 if not found_header and headers is not None:
-                    # Subsequent page without a repeated header — add matching rows
                     all_rows.extend(r for r in table if r and len(r) == n_cols)
+
+    return all_rows, headers, n_cols
+
+
+def _read_pdf_generic(filepath):
+    """
+    Standard row-per-transaction PDF parser.
+    Works for SBI, ICICI, Axis, Kotak, DBS, Yes Bank, IndusInd, and most
+    international banks whose statements have one row per transaction.
+
+    When the default extraction produces compressed mega-rows (whole page in one
+    cell), retries with horizontal_strategy="text" so pdfplumber uses text
+    positions for row boundaries instead of invisible grid lines.
+    """
+    all_rows, headers, n_cols = _extract_tables_from_pdf(filepath)
+
+    # If cells contain many \n the PDF has no visible horizontal rules —
+    # pdfplumber collapsed every page into one mega-row. Retry with text strategy.
+    if all_rows and _looks_compressed(all_rows):
+        alt_rows, alt_headers, alt_n_cols = _extract_tables_from_pdf(
+            filepath,
+            table_settings={"horizontal_strategy": "text", "vertical_strategy": "lines"}
+        )
+        if alt_rows and len(alt_rows) > len(all_rows):
+            all_rows, headers, n_cols = alt_rows, alt_headers, alt_n_cols
 
     if all_rows and headers:
         df = pd.DataFrame(all_rows, columns=headers)
