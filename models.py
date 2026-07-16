@@ -102,3 +102,18 @@ class UploadLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class PayeeRule(db.Model):
+    """User-defined payee → category memory. Applied before auto_categorize on every import."""
+    __tablename__ = 'payee_rules'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    payee_key = db.Column(db.String(200), nullable=False)    # normalized identifier (vpa or name)
+    payee_label = db.Column(db.String(200), default='')      # human-readable label shown in UI
+    category = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'payee_key', name='unique_payee_rule'),
+    )

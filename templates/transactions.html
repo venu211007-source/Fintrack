@@ -67,7 +67,8 @@
         <select name="category" class="form-select form-select-sm">
           <option value="">All Categories</option>
           {% for cat in ['Salary','Investment','Food & Dining','Shopping','Transport','Utilities',
-                         'Healthcare','Entertainment','Rent','Education','Insurance','EMI / Loan','Uncategorized'] %}
+                         'Healthcare','Entertainment','Rent','Education','Insurance','EMI / Loan',
+                         'Travel','Groceries','Personal Transfer','Bank Transfer','Uncategorized'] %}
           <option {% if cat_filter==cat %}selected{% endif %}>{{ cat }}</option>
           {% endfor %}
         </select>
@@ -340,10 +341,45 @@ document.getElementById('thisYearBtn').addEventListener('click', () => {
 
 // ── Category update ───────────────────────────────────────────────────────
 async function updateCat(sel) {
-  await fetch(`/transactions/${sel.dataset.id}/update`, {
+  const id  = sel.dataset.id;
+  const cat = sel.value;
+  await fetch(`/transactions/${id}/update`, {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({category: sel.value})
+    body: JSON.stringify({category: cat})
   });
+  if (cat && cat !== 'Uncategorized') showRememberToast(id, cat);
+}
+
+function showRememberToast(id, cat) {
+  document.getElementById('rememberToast')?.remove();
+  const t = document.createElement('div');
+  t.id = 'rememberToast';
+  t.style.cssText = 'position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:9999;';
+  t.innerHTML = `
+    <div class="d-flex align-items-center gap-3 px-3 py-2 shadow-lg"
+         style="background:#0f2272;color:#e2e8f0;border-radius:12px;border:1px solid #2d5be3;white-space:nowrap;">
+      <span class="small"><i class="bi bi-bookmark me-1 text-warning"></i>Always categorise this payee as <strong>${cat}</strong>?</span>
+      <button class="btn btn-sm fw-semibold" style="background:#f59e0b;color:#000;"
+              onclick="savePayeeRule(${id},'${cat.replace(/'/g,"\\'")}')">Remember</button>
+      <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('rememberToast')?.remove()">Skip</button>
+    </div>`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 8000);
+}
+
+async function savePayeeRule(id, cat) {
+  document.getElementById('rememberToast')?.remove();
+  const res = await fetch(`/transactions/${id}/update`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, remember_payee: true})
+  });
+  if ((await res.json()).success) {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;bottom:84px;left:50%;transform:translateX(-50%);z-index:9999;';
+    d.innerHTML = `<div class="px-3 py-2 small shadow" style="background:#064e3b;color:#6ee7b7;border-radius:10px;"><i class="bi bi-check-circle me-1"></i>Rule saved — future imports will auto-apply this category.</div>`;
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 3500);
+  }
 }
 
 // ── Toggle internal transfer ──────────────────────────────────────────────

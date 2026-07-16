@@ -10,7 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import extract, text
 
-from models import db, User, Account, Transaction, Asset, Liability, ExchangeRate, UploadLog
+from models import db, User, Account, Transaction, Asset, Liability, ExchangeRate, UploadLog, PayeeRule
 from parsers import parse_bank_statement, get_column_preview, process_transactions
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -516,6 +516,13 @@ def import_transactions():
         df, mapping = parse_bank_statement(fpath, col_map)
         rows = process_transactions(df, mapping)
 
+        # Load user's payee rules once for the whole batch
+        from parsers import extract_upi_payee
+        payee_rules = {
+            pr.payee_key: pr.category
+            for pr in PayeeRule.query.filter_by(user_id=current_user.id).all()
+        }
+
         imported = 0
         skipped = 0
         for r in rows:
@@ -527,13 +534,26 @@ def import_transactions():
             if exists:
                 skipped += 1
                 continue
+
+            # Apply payee rule if one exists (overrides auto_categorize)
+            category = r['category']
+            if payee_rules:
+                pk, _ = extract_upi_payee(r['description'])
+                if pk and pk in payee_rules:
+                    category = payee_rules[pk]
+                else:
+                    # Also check plain description match for non-UPI rules
+                    desc_key = r['description'].lower().strip()[:100]
+                    if desc_key in payee_rules:
+                        category = payee_rules[desc_key]
+
             t = Transaction(
                 account_id=acc.id,
                 date=r['date'],
                 description=r['description'],
                 amount=r['amount'],
                 amount_base=to_base(r['amount'], acc.currency, current_user),
-                category=r['category'],
+                category=category,
                 transaction_type=r['transaction_type'],
             )
             db.session.add(t)
@@ -710,6 +730,29 @@ def update_transaction(tid):
     if 'is_internal_transfer' in d:
         t.is_internal_transfer = bool(d['is_internal_transfer'])
     db.session.commit()
+
+    # If the client asks to remember this payee → category mapping
+    if d.get('remember_payee') and d.get('category'):
+        from parsers import extract_upi_payee
+        pk, plabel = extract_upi_payee(t.description)
+        if not pk:
+            # Non-UPI: use first 100 chars of description as key
+            pk = t.description.lower().strip()[:100]
+            plabel = t.description[:100]
+        if pk:
+            existing = PayeeRule.query.filter_by(
+                user_id=current_user.id, payee_key=pk).first()
+            if existing:
+                existing.category = d['category']
+            else:
+                db.session.add(PayeeRule(
+                    user_id=current_user.id,
+                    payee_key=pk,
+                    payee_label=plabel or pk,
+                    category=d['category'],
+                ))
+            db.session.commit()
+
     return jsonify({'success': True})
 
 
@@ -720,6 +763,26 @@ def delete_transaction(tid):
          .filter(Transaction.id == tid, Account.user_id == current_user.id)
          .first_or_404())
     db.session.delete(t)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/payee-rules')
+@login_required
+def list_payee_rules():
+    rules = PayeeRule.query.filter_by(user_id=current_user.id).order_by(PayeeRule.created_at.desc()).all()
+    return jsonify([{
+        'id': r.id, 'payee_key': r.payee_key,
+        'payee_label': r.payee_label or r.payee_key,
+        'category': r.category,
+    } for r in rules])
+
+
+@app.route('/api/payee-rules/<int:rid>/delete', methods=['POST'])
+@login_required
+def delete_payee_rule(rid):
+    r = PayeeRule.query.filter_by(id=rid, user_id=current_user.id).first_or_404()
+    db.session.delete(r)
     db.session.commit()
     return jsonify({'success': True})
 

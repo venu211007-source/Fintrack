@@ -553,80 +553,184 @@ def get_column_preview(df, n=5):
     return {'columns': list(df.columns), 'preview': safe_df.to_dict('records')}
 
 
-def auto_categorize(description):
-    desc = (description or '').lower()
-    rules = [
-        ('Salary',        ['salary', 'payroll', 'wages', 'pay credit', 'employer',
-                           'ctc', 'stipend', 'remuneration']),
-        ('Investment',    ['dividend', 'mutual fund', 'mf', 'sip', 'stock', 'equity',
-                           'fd interest', 'interest credit', 'birla', 'motilal', 'dsp',
-                           'sbi mf', 'hdfc mf', 'icici pru', 'nippon', 'mirae', 'tata mf',
-                           'redemption', 'cams', 'kfin', 'nsdl', 'cdsl', 'demat',
-                           'zerodha', 'groww', 'upstox', 'smallcase', 'icicidirect',
-                           'hdfcsec', 'kotak sec', 'sbicap']),
-        ('Food & Dining', ['restaurant', 'cafe', 'coffee', 'swiggy', 'zomato', 'uber eats',
-                           'dominos', 'pizza', 'burger', 'food', 'bakers', 'a2b', 'hotel',
-                           'dhaba', 'biryani', 'bakery', 'dairy', 'milk', 'grocery',
-                           'bigbasket', 'dunzo', 'zepto', 'instamart', 'fresh',
-                           'kfc', 'mcdonalds', 'subway', 'starbucks', 'chai', 'tata tea']),
-        ('Shopping',      ['amazon', 'flipkart', 'walmart', 'target', 'myntra', 'meesho',
-                           'nykaa', 'shop', 'mart', 'store', 'blinkit', 'valve', 'steam',
-                           'ajio', 'tatacliq', 'snapdeal', 'reliance', 'dmart', 'more',
-                           'lifestyle', 'shoppers stop', 'westside', 'h&m', 'zara',
-                           'decathlon', 'croma', 'vijay sales', 'poorvika']),
-        ('Transport',     ['uber', 'ola', 'rapido', 'lyft', 'taxi', 'metro', 'train',
-                           'petrol', 'fuel', 'diesel', 'parking', 'toll', 'irctc',
-                           'railway', 'bus', 'redbus', 'makemytrip transport', 'fasttag',
-                           'bmtc', 'best bus', 'ksrtc', 'hrtc', 'indigo', 'air india',
-                           'spicejet', 'vistara', 'akasa', 'aviation', 'cab', 'auto']),
-        ('Utilities',     ['electricity', 'water bill', 'gas bill', 'internet', 'broadband',
-                           'mobile recharge', 'dth', 'bill payment', 'bescom', 'bsnl',
-                           'airtel', 'jiofiber', 'myjio', 'youtube', 'apple',
-                           'tata power', 'adani electric', 'torrent power', 'mseb',
-                           'tneb', 'kseb', 'cesc', 'bijli', 'bbmp', 'nmc', 'ghmc',
-                           'paytm bills', 'phonepe bills', 'gpay bills']),
-        ('Healthcare',    ['hospital', 'clinic', 'pharmacy', 'medical', 'doctor', 'health',
-                           'apollo', 'medplus', 'dr ', 'fortis', '1mg', 'pharmeasy',
-                           'netmeds', 'manipal', 'aiims', 'diagnostic', 'lab', 'scan',
-                           'dental', 'optician', 'ayurveda', 'practo', 'healthians']),
-        ('Entertainment', ['netflix', 'spotify', 'prime video', 'hotstar', 'cinema', 'movie',
-                           'game', 'bookmyshow', 'pvr', 'inox', 'razorpay',
-                           'disney', 'zee5', 'sonyliv', 'jiocinema', 'mxplayer',
-                           'hungama', 'gaana', 'wynk', 'youtube premium',
-                           'steam', 'playstation', 'xbox', 'ea games', 'epic games']),
-        ('Rent',          ['rent', 'lease', 'house', 'pg ', 'hostel', 'maintenance',
-                           'society', 'housing', 'flat', 'apartment']),
-        ('Education',     ['school', 'college', 'university', 'course', 'tuition',
-                           'udemy', 'coursera', 'fees', 'edtech', 'byjus', 'unacademy',
-                           'vedantu', 'whitehat', 'simplilearn', 'exam', 'coaching']),
-        ('Insurance',     ['insurance', 'lic', 'premium', 'policy', 'ipruin',
-                           'star health', 'niva bupa', 'hdfc life', 'icici lombard',
-                           'bajaj allianz', 'sbi life', 'max life', 'term plan', 'mediclaim']),
-        ('EMI / Loan',    ['emi', 'loan', 'mortgage', 'equated', 'idbi bank', 'ach d- idbi',
-                           'neft dr-ibkl', 'gold loan', 'principle', 'principal',
-                           'home loan', 'car loan', 'personal loan', 'credit card bill',
-                           'repayment', 'instalment', 'tata capital', 'bajaj finance',
-                           'hdfc credila', 'muthoot', 'manappuram']),
-        ('Travel',        ['hotel', 'resort', 'oyo', 'makemytrip', 'goibibo', 'yatra',
-                           'cleartrip', 'ixigo', 'airbnb', 'booking.com', 'agoda',
-                           'visa', 'passport', 'travel insurance', 'forex', 'thomas cook',
-                           # International
-                           'expedia', 'kayak', 'trivago', 'marriott', 'hilton', 'hyatt',
-                           'intercontinental', 'ritz', 'emirates', 'lufthansa', 'delta',
-                           'united airlines', 'british airways', 'singapore airlines']),
-        ('Transfers',     ['neft cr', 'neft dr', 'imps', 'upi', 'rtgs',
-                           'ib funds transfer', 'funds transfer', 'self transfer',
-                           # Deutsche Bank / SEPA
-                           'sepa', 'überweisung', 'lastschrift', 'dauerauftrag',
-                           'gutschrift', 'wire transfer', 'zelle', 'venmo', 'paypal']),
-        ('Groceries',     ['whole foods', 'trader joe', 'kroger', 'safeway', 'costco',
-                           'walmart grocery', 'target grocery', 'aldi', 'lidl', 'rewe',
-                           'edeka', 'penny', 'netto', 'kaufland', 'dm markt']),
-    ]
-    for category, keywords in rules:
-        if any(k in desc for k in keywords):
+# ── UPI payee extraction ──────────────────────────────────────────────────────
+
+_VPA_RE = re.compile(
+    r'\b([a-z0-9._\-]+@(?:oksbi|okaxis|okicici|okhdfcbank|ybl|ibl|axl|paytm|apl|'
+    r'naviaxis|superyes|freecharge|indus|aubank|icici|hdfc|sbi|axis|kotak|yes|rbl|'
+    r'idbi|dbs|jupiteraxis|niyoicici|[a-z]{2,12}))\b',
+    re.IGNORECASE,
+)
+
+_BUSINESS_KW = {
+    'shop', 'store', 'mart', 'market', 'works', 'enterprise', 'traders', 'pvt', 'ltd',
+    'llp', 'inc', 'corp', 'agencies', 'services', 'solutions', 'tech', 'foods',
+    'restaurant', 'cafe', 'hotel', 'hospital', 'clinic', 'pharmacy', 'medical',
+    'school', 'college', 'industries', 'exports', 'imports', 'motors', 'garage',
+    'petrol', 'station', 'super', 'discount', 'wholesale', 'retail', 'steel',
+    'hardware', 'cement', 'paint', 'glass', 'telecom', 'broadband', 'fiber',
+    'electronics', 'digital', 'computer', 'printing', 'studio', 'fashion',
+    'boutique', 'salon', 'beauty', 'jewellers', 'opticals', 'gym', 'fitness',
+    'cycle', 'bicycle', 'sports', 'auto', 'tyres', 'spares', 'bakery', 'sweets',
+    'laundry', 'tailors', 'caterers', 'travels', 'tours', 'packaging', 'timber',
+}
+
+
+def extract_upi_payee(description):
+    """Return (payee_key, payee_label) from a UPI transaction description.
+
+    payee_key  — stable identifier for PayeeRule lookup (VPA or lowercased name)
+    payee_label — human-readable display name
+    Returns (None, None) when the description doesn't look like a UPI transaction.
+    """
+    desc = description or ''
+    if not re.search(r'\bUPI\b|\bPAYNOW\b|\bFAST PAYMENT\b', desc, re.IGNORECASE):
+        return None, None
+
+    vpa_match = _VPA_RE.search(desc)
+    vpa = vpa_match.group(1).lower() if vpa_match else None
+
+    # Extract display name: "UPI/P2P/txnid/DisplayName/remark"
+    name = None
+    m = re.search(r'UPI/[A-Z0-9]+/\d+/([^/\d][^/]+?)(?:/|$)', desc, re.IGNORECASE)
+    if m:
+        name = m.group(1).strip()
+
+    # Fallback: derive readable name from VPA local part
+    if not name and vpa:
+        local = vpa.split('@')[0]
+        if not local.isdigit():
+            name = local.replace('.', ' ').replace('_', ' ').replace('-', ' ').title()
+
+    # Fallback: scan description segments
+    if not name:
+        for part in reversed(re.split(r'[/\-]', desc)):
+            p = re.sub(r'\s*\d{8,}.*$', '', part).strip()
+            if p and len(p) > 2 and p.upper() not in ('UPI', 'P2P', 'P2M', 'NEFT', 'IMPS', 'CR', 'DR'):
+                name = p
+                break
+
+    key = vpa or (name.lower().strip() if name else None)
+    label = name or vpa
+    return key, label
+
+
+def _is_personal_upi(vpa, name):
+    """Return True when the payee looks like a private individual, not a merchant."""
+    combined = ((name or '') + ' ' + (vpa or '')).lower()
+    # Business keyword anywhere → not personal
+    if any(kw in combined for kw in _BUSINESS_KW):
+        return False
+    # Phone-number VPA (e.g. 9876543210@okaxis) → personal
+    if vpa:
+        local = vpa.split('@')[0]
+        if local.isdigit() and len(local) >= 8:
+            return True
+    # Two-word human name with no digits → personal
+    if name:
+        words = name.strip().split()
+        if 1 <= len(words) <= 3 and all(re.match(r'^[A-Za-z\.]+$', w) for w in words):
+            return True
+    return False
+
+
+# ── Keyword rules ─────────────────────────────────────────────────────────────
+
+_KEYWORD_RULES = [
+    ('Salary',        ['salary', 'payroll', 'wages', 'pay credit', 'employer',
+                       'ctc', 'stipend', 'remuneration']),
+    ('Investment',    ['dividend', 'mutual fund', 'mf', 'sip', 'stock', 'equity',
+                       'fd interest', 'interest credit', 'birla', 'motilal', 'dsp',
+                       'sbi mf', 'hdfc mf', 'icici pru', 'nippon', 'mirae', 'tata mf',
+                       'redemption', 'cams', 'kfin', 'nsdl', 'cdsl', 'demat',
+                       'zerodha', 'groww', 'upstox', 'smallcase', 'icicidirect',
+                       'hdfcsec', 'kotak sec', 'sbicap']),
+    ('Food & Dining', ['restaurant', 'cafe', 'coffee', 'swiggy', 'zomato', 'uber eats',
+                       'dominos', 'pizza', 'burger', 'food', 'bakers', 'a2b',
+                       'dhaba', 'biryani', 'bakery', 'dairy', 'milk', 'grocery',
+                       'bigbasket', 'dunzo', 'zepto', 'instamart', 'fresh',
+                       'kfc', 'mcdonalds', 'subway', 'starbucks', 'chai', 'tata tea']),
+    ('Shopping',      ['amazon', 'flipkart', 'walmart', 'target', 'myntra', 'meesho',
+                       'nykaa', 'shop', 'mart', 'store', 'blinkit', 'steam',
+                       'ajio', 'tatacliq', 'snapdeal', 'reliance', 'dmart', 'more',
+                       'lifestyle', 'shoppers stop', 'westside', 'h&m', 'zara',
+                       'decathlon', 'croma', 'vijay sales', 'poorvika',
+                       'cycle', 'bicycle', 'sports', 'hardware', 'tyres', 'spares']),
+    ('Transport',     ['uber', 'ola', 'rapido', 'lyft', 'taxi', 'metro', 'train',
+                       'petrol', 'fuel', 'diesel', 'parking', 'toll', 'irctc',
+                       'railway', 'bus', 'redbus', 'fasttag', 'bmtc', 'best bus',
+                       'ksrtc', 'hrtc', 'indigo', 'air india', 'spicejet', 'vistara',
+                       'akasa', 'aviation', 'cab', 'auto', 'motors', 'garage']),
+    ('Utilities',     ['electricity', 'water bill', 'gas bill', 'internet', 'broadband',
+                       'mobile recharge', 'dth', 'bill payment', 'bescom', 'bsnl',
+                       'airtel', 'jiofiber', 'myjio', 'tata power', 'adani electric',
+                       'torrent power', 'mseb', 'tneb', 'kseb', 'cesc', 'bijli',
+                       'bbmp', 'nmc', 'ghmc', 'paytm bills', 'phonepe bills']),
+    ('Healthcare',    ['hospital', 'clinic', 'pharmacy', 'medical', 'doctor', 'health',
+                       'apollo', 'medplus', 'dr ', 'fortis', '1mg', 'pharmeasy',
+                       'netmeds', 'manipal', 'aiims', 'diagnostic', 'lab', 'scan',
+                       'dental', 'optician', 'ayurveda', 'practo', 'healthians']),
+    ('Entertainment', ['netflix', 'spotify', 'prime video', 'hotstar', 'cinema', 'movie',
+                       'game', 'bookmyshow', 'pvr', 'inox', 'disney', 'zee5',
+                       'sonyliv', 'jiocinema', 'mxplayer', 'hungama', 'gaana', 'wynk',
+                       'youtube premium', 'playstation', 'xbox', 'ea games', 'epic games']),
+    ('Rent',          ['rent', 'lease', 'pg ', 'hostel', 'maintenance',
+                       'society', 'housing', 'flat', 'apartment']),
+    ('Education',     ['school', 'college', 'university', 'course', 'tuition',
+                       'udemy', 'coursera', 'fees', 'edtech', 'byjus', 'unacademy',
+                       'vedantu', 'whitehat', 'simplilearn', 'exam', 'coaching']),
+    ('Insurance',     ['insurance', 'lic', 'policy', 'ipruin', 'star health', 'niva bupa',
+                       'hdfc life', 'icici lombard', 'bajaj allianz', 'sbi life',
+                       'max life', 'term plan', 'mediclaim']),
+    ('EMI / Loan',    ['emi', 'loan', 'mortgage', 'equated', 'gold loan', 'principal',
+                       'home loan', 'car loan', 'personal loan', 'credit card bill',
+                       'repayment', 'instalment', 'tata capital', 'bajaj finance',
+                       'hdfc credila', 'muthoot', 'manappuram']),
+    ('Travel',        ['resort', 'oyo', 'makemytrip', 'goibibo', 'yatra', 'cleartrip',
+                       'ixigo', 'airbnb', 'booking.com', 'agoda', 'forex', 'thomas cook',
+                       'expedia', 'kayak', 'trivago', 'marriott', 'hilton', 'hyatt',
+                       'emirates', 'lufthansa', 'delta', 'united airlines',
+                       'british airways', 'singapore airlines']),
+    ('Personal Transfer', ['self transfer']),
+    ('Bank Transfer', ['neft cr', 'neft dr', 'imps', 'rtgs', 'ib funds transfer',
+                       'funds transfer', 'sepa', 'wire transfer', 'zelle', 'venmo', 'paypal']),
+    ('Groceries',     ['whole foods', 'trader joe', 'kroger', 'safeway', 'costco',
+                       'walmart grocery', 'target grocery', 'aldi', 'lidl', 'rewe',
+                       'edeka', 'penny', 'netto', 'kaufland', 'dm markt']),
+]
+
+
+def _keyword_match(text):
+    t = text.lower()
+    for category, keywords in _KEYWORD_RULES:
+        if any(k in t for k in keywords):
             return category
     return 'Uncategorized'
+
+
+def auto_categorize(description):
+    """Categorize a transaction description.
+
+    UPI transactions are handled specially:
+    - If the payee looks like a private individual → 'Personal Transfer'
+    - Otherwise keyword-match on the extracted merchant name first, then fall
+      through to full-description keyword matching.
+    """
+    desc = description or ''
+
+    payee_key, payee_label = extract_upi_payee(desc)
+    if payee_key is not None:
+        # It is a UPI transaction — decide based on the payee identity
+        if _is_personal_upi(payee_key, payee_label):
+            return 'Personal Transfer'
+        # Known merchant keywords in the payee name take priority
+        if payee_label:
+            cat = _keyword_match(payee_label)
+            if cat != 'Uncategorized':
+                return cat
+
+    # Full-description keyword pass (covers non-UPI and UPI with no payee extracted)
+    return _keyword_match(desc)
 
 
 def process_transactions(df, column_mapping):
