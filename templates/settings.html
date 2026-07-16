@@ -41,6 +41,44 @@
         </form>
       </div>
     </div>
+
+    <!-- Plan & Billing -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-3 pb-0">
+        <h6 class="fw-bold mb-0"><i class="bi bi-star-fill me-2 text-warning"></i>Plan &amp; Billing</h6>
+      </div>
+      <div class="card-body">
+        {% if current_user.is_premium %}
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <span class="badge fw-semibold px-3 py-2 fs-6" style="background:#f59e0b;color:#000;">PRO</span>
+          <div>
+            <div class="fw-semibold">Premium Plan</div>
+            {% if current_user.premium_until %}
+            <div class="text-muted small">Renews {{ current_user.premium_until.strftime('%d %b %Y') }}</div>
+            {% endif %}
+          </div>
+        </div>
+        <p class="text-muted small mb-3">Unlimited accounts, unlimited uploads, and all features unlocked.</p>
+        <form method="POST" action="{{ url_for('billing_portal') }}">
+          <button type="submit" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-credit-card me-1"></i>Manage Billing &amp; Cancel
+          </button>
+        </form>
+        {% else %}
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <span class="badge bg-secondary fw-semibold px-3 py-2 fs-6">FREE</span>
+          <div>
+            <div class="fw-semibold">Free Plan</div>
+            <div class="text-muted small">3 accounts · 5 uploads/month</div>
+          </div>
+        </div>
+        <p class="text-muted small mb-3">Upgrade to unlock unlimited accounts, unlimited uploads, and CSV export.</p>
+        <a href="{{ url_for('pricing') }}" class="btn btn-sm fw-semibold" style="background:#f59e0b;color:#000;">
+          <i class="bi bi-lightning-fill me-1"></i>Upgrade to Premium — ₹299/mo
+        </a>
+        {% endif %}
+      </div>
+    </div>
   </div>
 
   <!-- Exchange Rates -->

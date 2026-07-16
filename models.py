@@ -13,11 +13,16 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     base_currency = db.Column(db.String(3), default='USD')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    is_premium = db.Column(db.Boolean, default=False)
+    stripe_customer_id = db.Column(db.String(100))
+    stripe_subscription_id = db.Column(db.String(100))
+    premium_until = db.Column(db.DateTime)
 
     accounts = db.relationship('Account', backref='user', lazy=True, cascade='all, delete-orphan')
     assets = db.relationship('Asset', backref='user', lazy=True, cascade='all, delete-orphan')
     liabilities = db.relationship('Liability', backref='user', lazy=True, cascade='all, delete-orphan')
     exchange_rates = db.relationship('ExchangeRate', backref='user', lazy=True, cascade='all, delete-orphan')
+    upload_logs = db.relationship('UploadLog', backref='user', lazy=True, cascade='all, delete-orphan')
 
 
 class Account(db.Model):
@@ -90,3 +95,10 @@ class ExchangeRate(db.Model):
     __table_args__ = (
         db.UniqueConstraint('user_id', 'from_currency', 'to_currency', name='unique_rate'),
     )
+
+
+class UploadLog(db.Model):
+    __tablename__ = 'upload_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+{% block title %}Pricing — FinTrack{% endblock %}
+{% block content %}
+
+<div class="text-center mb-5 mt-2">
+  <h2 class="fw-bold">Simple, honest pricing</h2>
+  <p class="text-muted fs-5">Start free. Upgrade when you need more.</p>
+</div>
+
+<div class="row justify-content-center g-4 mb-5">
+
+  <!-- Free Plan -->
+  <div class="col-md-5">
+    <div class="card border-0 shadow-sm h-100" style="border-radius:16px!important;">
+      <div class="card-body p-4 p-md-5">
+        <div class="mb-3">
+          <span class="badge bg-secondary px-3 py-2 fw-semibold">FREE</span>
+        </div>
+        <div class="mb-4">
+          <span class="fs-1 fw-bold">₹0</span>
+          <span class="text-muted">/month</span>
+        </div>
+        <p class="text-muted mb-4">Perfect for getting started and tracking one bank account.</p>
+        <ul class="list-unstyled mb-4">
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span><strong>{{ "{}/{}".format(accounts_used, 3) if current_user.is_authenticated else "3" }}</strong> bank accounts</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span><strong>5 statement uploads</strong> per month</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span>Auto-categorisation</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-success"></i>
+            <span>Spending charts &amp; analytics</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-x-circle text-muted"></i>
+            <span class="text-muted">CSV export</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-x-circle text-muted"></i>
+            <span class="text-muted">Multi-currency net worth</span>
+          </li>
+          <li class="d-flex align-items-center gap-2">
+            <i class="bi bi-x-circle text-muted"></i>
+            <span class="text-muted">Unlimited history</span>
+          </li>
+        </ul>
+        {% if current_user.is_authenticated and not current_user.is_premium %}
+        <div class="d-grid">
+          <button class="btn btn-outline-secondary" disabled>Current plan</button>
+        </div>
+        {% elif not current_user.is_authenticated %}
+        <div class="d-grid">
+          <a href="{{ url_for('register') }}" class="btn btn-outline-primary">Get started free</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Premium Plan -->
+  <div class="col-md-5">
+    <div class="card border-0 shadow h-100 position-relative overflow-hidden"
+         style="border-radius:16px!important;border:2px solid #f59e0b!important;">
+      <!-- Popular badge -->
+      <div class="position-absolute top-0 end-0 m-3">
+        <span class="badge" style="background:#f59e0b;color:#000;font-size:.75rem;padding:.4em .8em;">BEST VALUE</span>
+      </div>
+      <div class="card-body p-4 p-md-5">
+        <div class="mb-3">
+          <span class="badge fw-semibold px-3 py-2" style="background:#f59e0b;color:#000;">PREMIUM</span>
+        </div>
+        <div class="mb-4">
+          <span class="fs-1 fw-bold">₹299</span>
+          <span class="text-muted">/month</span>
+        </div>
+        <p class="text-muted mb-4">For anyone serious about their personal finances.</p>
+        <ul class="list-unstyled mb-4">
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-warning"></i>
+            <span><strong>Unlimited</strong> bank accounts</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-warning"></i>
+            <span><strong>Unlimited</strong> statement uploads</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-warning"></i>
+            <span>Auto-categorisation</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-warning"></i>
+            <span>Spending charts &amp; analytics</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-warning"></i>
+            <span><strong>CSV export</strong> of all transactions</span>
+          </li>
+          <li class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-check-circle-fill text-warning"></i>
+            <span><strong>Multi-currency</strong> net worth</span>
+          </li>
+          <li class="d-flex align-items-center gap-2">
+            <i class="bi bi-check-circle-fill text-warning"></i>
+            <span><strong>Full transaction history</strong></span>
+          </li>
+        </ul>
+
+        {% if current_user.is_authenticated and current_user.is_premium %}
+        <div class="d-grid">
+          <button class="btn fw-semibold" style="background:#f59e0b;color:#000;" disabled>
+            <i class="bi bi-star-fill me-1"></i>You're on Premium
+          </button>
+        </div>
+        {% elif stripe_configured %}
+        <div class="d-grid">
+          <form method="POST" action="{{ url_for('checkout_start') }}">
+            <button type="submit" class="btn w-100 fw-semibold py-2" style="background:#f59e0b;color:#000;">
+              <i class="bi bi-lightning-fill me-1"></i>Upgrade to Premium
+            </button>
+          </form>
+        </div>
+        <p class="text-muted small text-center mt-2 mb-0">Cancel any time · Secure payment via Stripe</p>
+        {% else %}
+        <div class="d-grid">
+          <button class="btn fw-semibold py-2" style="background:#f59e0b;color:#000;" disabled>
+            <i class="bi bi-lightning-fill me-1"></i>Coming Soon
+          </button>
+        </div>
+        <p class="text-muted small text-center mt-2 mb-0">Payment setup in progress</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FAQ -->
+<div class="row justify-content-center mb-5">
+  <div class="col-lg-8">
+    <h5 class="fw-bold text-center mb-4">Frequently asked questions</h5>
+    <div class="accordion border-0" id="faq">
+
+      <div class="accordion-item border-0 mb-2 shadow-sm rounded-3 overflow-hidden">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+            Can I cancel my subscription any time?
+          </button>
+        </h2>
+        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faq">
+          <div class="accordion-body text-muted">
+            Yes. You can cancel from Settings → Manage Billing at any time. You keep Premium access until the end of the billing period you've paid for.
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item border-0 mb-2 shadow-sm rounded-3 overflow-hidden">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+            Is my financial data safe?
+          </button>
+        </h2>
+        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faq">
+          <div class="accordion-body text-muted">
+            Your data is stored in a private PostgreSQL database. We never sell it, never share it, and never connect directly to your bank. See our <a href="{{ url_for('privacy') }}">Privacy Policy</a> for details.
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item border-0 mb-2 shadow-sm rounded-3 overflow-hidden">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+            Which banks are supported?
+          </button>
+        </h2>
+        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faq">
+          <div class="accordion-body text-muted">
+            FinTrack supports PDF and CSV statements from HDFC, ICICI, SBI, Axis, Kotak, DBS, Deutsche Bank, and many more. If your bank exports CSV, it will work with a one-time column mapping.
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item border-0 shadow-sm rounded-3 overflow-hidden">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+            What payment methods are accepted?
+          </button>
+        </h2>
+        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faq">
+          <div class="accordion-body text-muted">
+            All major debit and credit cards are accepted via Stripe. Stripe is a globally trusted payment processor used by thousands of businesses.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}

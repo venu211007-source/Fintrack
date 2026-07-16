@@ -16,6 +16,26 @@
 </div>
 {% endif %}
 
+{% if not current_user.is_premium %}
+{% set uploads_left = [upload_limit - uploads_used, 0] | max %}
+{% if uploads_left == 0 %}
+<div class="alert alert-warning d-flex align-items-center gap-3">
+  <i class="bi bi-exclamation-triangle-fill fs-4 flex-shrink-0"></i>
+  <div>
+    <strong>Monthly upload limit reached.</strong>
+    You have used all {{ upload_limit }} free uploads this month.
+    <a href="{{ url_for('pricing') }}" class="alert-link">Upgrade to Premium</a> for unlimited uploads.
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info py-2 px-3 small d-flex align-items-center gap-2">
+  <i class="bi bi-info-circle"></i>
+  Free plan: <strong>{{ uploads_left }} upload{{ 's' if uploads_left != 1 }} remaining</strong> this month.
+  <a href="{{ url_for('pricing') }}" class="ms-1">Upgrade for unlimited →</a>
+</div>
+{% endif %}
+{% endif %}
+
 <div class="row g-4">
   <div class="col-lg-7">
     <!-- Step 1: Upload -->

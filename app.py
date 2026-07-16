@@ -1,5 +1,6 @@
 import os
 import json
+import stripe
 import requests as req_http
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
@@ -7,9 +8,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from sqlalchemy import extract
+from sqlalchemy import extract, text
 
-from models import db, User, Account, Transaction, Asset, Liability, ExchangeRate
+from models import db, User, Account, Transaction, Asset, Liability, ExchangeRate, UploadLog
 from parsers import parse_bank_statement, get_column_preview, process_transactions
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +28,16 @@ app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 ALLOWED_EXT = {'csv', 'xlsx', 'xls', 'pdf'}
 
+# Stripe config (set these env vars on Railway)
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+APP_URL = os.environ.get('APP_URL', 'http://localhost:5000').rstrip('/')
+
+FREE_ACCOUNT_LIMIT = 3
+FREE_UPLOAD_LIMIT = 5
+
 db.init_app(app)
 
 login_manager = LoginManager(app)
@@ -34,6 +45,29 @@ login_manager.login_view = 'login'
 login_manager.login_message_category = 'warning'
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+
+def _migrate_db():
+    """Add new columns to existing tables without losing data. Safe to run multiple times."""
+    migrations = [
+        "ALTER TABLE users ADD COLUMN is_premium BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE users ADD COLUMN stripe_customer_id VARCHAR(100)",
+        "ALTER TABLE users ADD COLUMN stripe_subscription_id VARCHAR(100)",
+        "ALTER TABLE users ADD COLUMN premium_until TIMESTAMP",
+    ]
+    with db.engine.connect() as conn:
+        for stmt in migrations:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+
+
+# Ensure tables exist and schema is up to date every startup (works under gunicorn too)
+with app.app_context():
+    db.create_all()
+    _migrate_db()
 
 
 @app.after_request
@@ -84,6 +118,15 @@ def missing_rates_warning(user):
         if get_rate(user.id, cur, user.base_currency) == 1.0:
             missing.append(cur)
     return missing
+
+
+def _uploads_this_month(user_id):
+    now = datetime.utcnow()
+    return UploadLog.query.filter(
+        UploadLog.user_id == user_id,
+        extract('month', UploadLog.created_at) == now.month,
+        extract('year', UploadLog.created_at) == now.year
+    ).count()
 
 
 def fetch_live_rates(user):
@@ -354,6 +397,12 @@ def accounts():
 @app.route('/accounts/add', methods=['POST'])
 @login_required
 def add_account():
+    if not current_user.is_premium:
+        existing = Account.query.filter_by(user_id=current_user.id).count()
+        if existing >= FREE_ACCOUNT_LIMIT:
+            flash(f'Free plan allows up to {FREE_ACCOUNT_LIMIT} accounts. '
+                  f'<a href="{url_for("pricing")}">Upgrade to Premium</a> for unlimited accounts.', 'warning')
+            return redirect(url_for('accounts'))
     name = request.form.get('name', '').strip()
     bank = request.form.get('bank_name', '').strip()
     if not name or not bank:
@@ -406,12 +455,22 @@ def delete_account(aid):
 @login_required
 def upload():
     accs = Account.query.filter_by(user_id=current_user.id).all()
-    return render_template('upload.html', accounts=accs)
+    uploads_used = _uploads_this_month(current_user.id)
+    return render_template('upload.html', accounts=accs,
+                           uploads_used=uploads_used,
+                           upload_limit=FREE_UPLOAD_LIMIT)
 
 
 @app.route('/upload/preview', methods=['POST'])
 @login_required
 def upload_preview():
+    if not current_user.is_premium:
+        used = _uploads_this_month(current_user.id)
+        if used >= FREE_UPLOAD_LIMIT:
+            return jsonify({'error': (
+                f'You have used all {FREE_UPLOAD_LIMIT} uploads for this month on the free plan. '
+                f'Upgrade to Premium for unlimited uploads.'
+            )}), 403
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
     f = request.files['file']
@@ -480,6 +539,10 @@ def import_transactions():
         db.session.commit()
         if os.path.exists(fpath):
             os.remove(fpath)
+
+        # Log this upload for monthly quota tracking
+        db.session.add(UploadLog(user_id=current_user.id))
+        db.session.commit()
 
         _detect_transfers(current_user.id)
         return jsonify({'success': True, 'imported': imported, 'skipped': skipped})
@@ -863,7 +926,168 @@ def recalculate_rates():
     return redirect(url_for('settings'))
 
 
+# ---------- pricing ----------
+
+@app.route('/pricing')
+def pricing():
+    uploads_used = _uploads_this_month(current_user.id) if current_user.is_authenticated else 0
+    accounts_used = Account.query.filter_by(user_id=current_user.id).count() if current_user.is_authenticated else 0
+    return render_template('pricing.html',
+                           stripe_key=STRIPE_PUBLISHABLE_KEY,
+                           stripe_configured=bool(stripe.api_key and STRIPE_PRICE_ID),
+                           uploads_used=uploads_used,
+                           accounts_used=accounts_used)
+
+
+# ---------- stripe checkout ----------
+
+@app.route('/checkout/start', methods=['POST'])
+@login_required
+def checkout_start():
+    if not stripe.api_key or not STRIPE_PRICE_ID:
+        flash('Payment system is not set up yet. Please contact support.', 'warning')
+        return redirect(url_for('pricing'))
+    if current_user.is_premium:
+        flash('You already have Premium!', 'info')
+        return redirect(url_for('dashboard'))
+
+    customer_id = current_user.stripe_customer_id
+    if not customer_id:
+        try:
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                name=current_user.name,
+                metadata={'user_id': str(current_user.id)}
+            )
+            current_user.stripe_customer_id = customer.id
+            db.session.commit()
+            customer_id = customer.id
+        except stripe.error.StripeError as e:
+            flash(f'Could not start checkout: {e.user_message}', 'danger')
+            return redirect(url_for('pricing'))
+
+    try:
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=['card'],
+            line_items=[{'price': STRIPE_PRICE_ID, 'quantity': 1}],
+            mode='subscription',
+            success_url=APP_URL + url_for('checkout_success') + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=APP_URL + url_for('checkout_cancel'),
+        )
+    except stripe.error.StripeError as e:
+        flash(f'Checkout error: {e.user_message}', 'danger')
+        return redirect(url_for('pricing'))
+
+    return redirect(session.url, code=303)
+
+
+@app.route('/checkout/success')
+@login_required
+def checkout_success():
+    session_id = request.args.get('session_id')
+    if session_id and stripe.api_key:
+        try:
+            sess = stripe.checkout.Session.retrieve(session_id)
+            if sess.subscription:
+                sub = stripe.Subscription.retrieve(sess.subscription)
+                current_user.is_premium = True
+                current_user.stripe_subscription_id = sub.id
+                current_user.stripe_customer_id = current_user.stripe_customer_id or sess.customer
+                current_user.premium_until = datetime.fromtimestamp(sub['current_period_end'])
+                db.session.commit()
+        except Exception as e:
+            app.logger.error(f'Stripe success handler error: {e}')
+    flash('Welcome to FinTrack Premium! All limits are now unlocked.', 'success')
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/checkout/cancel')
+@login_required
+def checkout_cancel():
+    flash('Payment cancelled. You can upgrade any time from the Pricing page.', 'info')
+    return redirect(url_for('pricing'))
+
+
+# ---------- stripe webhook ----------
+
+def _handle_checkout_completed(session):
+    customer_id = session.get('customer')
+    subscription_id = session.get('subscription')
+    user = User.query.filter_by(stripe_customer_id=customer_id).first()
+    if not user:
+        user = User.query.filter_by(email=session.get('customer_details', {}).get('email')).first()
+    if user and subscription_id:
+        try:
+            sub = stripe.Subscription.retrieve(subscription_id)
+            user.is_premium = True
+            user.stripe_subscription_id = subscription_id
+            user.stripe_customer_id = customer_id
+            user.premium_until = datetime.fromtimestamp(sub['current_period_end'])
+            db.session.commit()
+        except Exception as e:
+            app.logger.error(f'Webhook checkout completed error: {e}')
+
+
+def _handle_subscription_event(sub):
+    user = User.query.filter_by(stripe_subscription_id=sub['id']).first()
+    if not user:
+        user = User.query.filter_by(stripe_customer_id=sub.get('customer')).first()
+    if not user:
+        return
+    if sub['status'] in ('canceled', 'unpaid', 'incomplete_expired'):
+        user.is_premium = False
+        user.stripe_subscription_id = None
+    elif sub['status'] == 'active':
+        user.is_premium = True
+        user.premium_until = datetime.fromtimestamp(sub['current_period_end'])
+    db.session.commit()
+
+
+@app.route('/webhook/stripe', methods=['POST'])
+def stripe_webhook():
+    payload = request.get_data()
+    sig = request.headers.get('Stripe-Signature', '')
+    if not STRIPE_WEBHOOK_SECRET:
+        return jsonify({'error': 'Webhook secret not configured'}), 400
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
+    except (ValueError, stripe.error.SignatureVerificationError):
+        return jsonify({'error': 'Invalid payload or signature'}), 400
+
+    etype = event['type']
+    obj = event['data']['object']
+    if etype == 'checkout.session.completed':
+        _handle_checkout_completed(obj)
+    elif etype in ('customer.subscription.updated', 'customer.subscription.deleted'):
+        _handle_subscription_event(obj)
+    elif etype == 'invoice.payment_failed':
+        cid = obj.get('customer')
+        user = User.query.filter_by(stripe_customer_id=cid).first()
+        if user:
+            app.logger.warning(f'Payment failed for user {user.id} ({user.email})')
+
+    return jsonify({'received': True})
+
+
+# ---------- billing portal ----------
+
+@app.route('/billing/portal', methods=['POST'])
+@login_required
+def billing_portal():
+    if not current_user.stripe_customer_id or not stripe.api_key:
+        flash('Billing portal is not available. Contact support.', 'warning')
+        return redirect(url_for('settings'))
+    try:
+        portal = stripe.billing_portal.Session.create(
+            customer=current_user.stripe_customer_id,
+            return_url=APP_URL + url_for('settings')
+        )
+        return redirect(portal.url, code=303)
+    except stripe.error.StripeError as e:
+        flash(f'Could not open billing portal: {e.user_message}', 'danger')
+        return redirect(url_for('settings'))
+
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(debug=False, port=5000)
