@@ -264,6 +264,9 @@ def register():
         if not name or not email or not pw:
             flash('All fields are required.', 'danger')
             return render_template('register.html')
+        if not request.form.get('consent'):
+            flash('You must agree to the Privacy Policy and Terms of Service to create an account.', 'danger')
+            return render_template('register.html')
         if pw != pw2:
             flash('Passwords do not match.', 'danger')
             return render_template('register.html')

@@ -59,6 +59,16 @@
           </select>
           <div class="form-text">All amounts will be consolidated in this currency.</div>
         </div>
+        <div class="mb-4">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="consent" id="consent" required>
+            <label class="form-check-label small text-muted" for="consent">
+              I agree to the <a href="{{ url_for('privacy') }}" target="_blank">Privacy Policy</a>
+              and <a href="{{ url_for('terms') }}" target="_blank">Terms of Service</a>,
+              and consent to FinTrack securely storing my uploaded statement data to provide the service.
+            </label>
+          </div>
+        </div>
         <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">
           <i class="bi bi-person-plus me-2"></i>Create Account
         </button>
