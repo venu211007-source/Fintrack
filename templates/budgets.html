@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+{% block title %}Budgets — FinTrack{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">Budgets</h4>
+    <span class="text-muted">{{ current_month }}</span>
+  </div>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#budgetModal">
+    <i class="bi bi-plus-lg me-1"></i>Set Budget
+  </button>
+</div>
+
+{% if budgets %}
+<!-- Budget cards grid -->
+<div class="row g-3 mb-5">
+  {% for b in budgets %}
+  {% set s = spent.get(b.category, 0) %}
+  {% set pct = [(s / b.amount * 100), 100] | min | round(1) %}
+  {% set over = s > b.amount %}
+  {% set warn = pct >= 80 and not over %}
+  <div class="col-sm-6 col-lg-4">
+    <div class="card border-0 shadow-sm h-100" style="border-radius:14px!important;">
+      <div class="card-body p-3">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div>
+            <div class="fw-semibold">{{ b.category }}</div>
+            <div class="text-muted small">limit {{ current_user.base_currency }} {{ '{:,.0f}'.format(b.amount) }}</div>
+          </div>
+          <div class="d-flex gap-2 align-items-center">
+            {% if over %}
+            <span class="badge bg-danger-subtle text-danger fw-semibold">Over</span>
+            {% elif warn %}
+            <span class="badge bg-warning-subtle text-warning fw-semibold">{{ pct|int }}%</span>
+            {% endif %}
+            <button class="btn btn-link btn-sm p-0 text-muted"
+                    onclick="openEdit('{{ b.id }}','{{ b.category }}',{{ b.amount }})">
+              <i class="bi bi-pencil fs-6"></i>
+            </button>
+            <button class="btn btn-link btn-sm p-0 text-danger"
+                    onclick="deleteBudget({{ b.id }}, this)">
+              <i class="bi bi-trash fs-6"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="progress mb-2" style="height:8px;border-radius:8px;">
+          <div class="progress-bar {% if over %}bg-danger{% elif warn %}bg-warning{% else %}bg-success{% endif %}"
+               role="progressbar" style="width:{{ pct }}%;border-radius:8px;"></div>
+        </div>
+
+        <div class="d-flex justify-content-between small">
+          <span class="{% if over %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+            Spent {{ current_user.base_currency }} {{ '{:,.0f}'.format(s) }}
+          </span>
+          <span class="{% if over %}text-danger{% else %}text-success{% endif %} fw-semibold">
+            {% if over %}
+            Over by {{ current_user.base_currency }} {{ '{:,.0f}'.format(s - b.amount) }}
+            {% else %}
+            {{ current_user.base_currency }} {{ '{:,.0f}'.format(b.amount - s) }} left
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card border-0 shadow-sm mb-5" style="border-radius:14px;">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-bullseye fs-1 text-muted opacity-25 d-block mb-3"></i>
+    <h6 class="fw-bold">No budgets set yet</h6>
+    <p class="text-muted small mb-3">Set a monthly spending limit for any category and track how you're doing in real time.</p>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#budgetModal">
+      <i class="bi bi-plus-lg me-1"></i>Set your first budget
+    </button>
+  </div>
+</div>
+{% endif %}
+
+<!-- Spending by category this month (categories with no budget) -->
+{% set budgeted_cats = budgets | map(attribute='category') | list %}
+{% set unbudgeted = spent.items() | selectattr('0', 'ne', 'Uncategorized') | list %}
+{% if unbudgeted %}
+<h6 class="fw-bold mb-3">This month — all categories</h6>
+<div class="card border-0 shadow-sm mb-5" style="border-radius:14px;">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Category</th>
+            <th class="text-end">Spent</th>
+            <th class="text-end pe-3">Budget</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cat, amt in (spent.items() | sort(attribute='1', reverse=True)) %}
+          {% if cat != 'Uncategorized' %}
+          {% set bud = budgets | selectattr('category', 'equalto', cat) | list %}
+          <tr>
+            <td class="ps-3 fw-semibold small">{{ cat }}</td>
+            <td class="text-end small">{{ current_user.base_currency }} {{ '{:,.2f}'.format(amt) }}</td>
+            <td class="text-end pe-3 small">
+              {% if bud %}
+              {{ current_user.base_currency }} {{ '{:,.2f}'.format(bud[0].amount) }}
+              {% else %}
+              <button class="btn btn-link btn-sm p-0 text-muted small"
+                      onclick="openNew('{{ cat }}')">Set budget</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Recurring payments section -->
+{% if recurring %}
+<h6 class="fw-bold mb-3"><i class="bi bi-arrow-repeat me-2 text-primary"></i>Detected Recurring Payments</h6>
+<div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Description</th>
+            <th>Category</th>
+            <th class="text-end">Avg amount</th>
+            <th class="text-center">Seen</th>
+            <th class="text-end">Last paid</th>
+            <th class="text-end pe-3">Next expected</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recurring %}
+          <tr>
+            <td class="ps-3 small fw-semibold" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ r.description }}">
+              {{ r.description }}
+            </td>
+            <td><span class="badge bg-light text-dark small">{{ r.category }}</span></td>
+            <td class="text-end small">
+              {{ r.currency }} {{ '{:,.2f}'.format(r.avg_amount) }}
+              {% if r.min_amount != r.max_amount %}
+              <div class="text-muted" style="font-size:.75rem;">{{ '{:,.0f}'.format(r.min_amount) }}–{{ '{:,.0f}'.format(r.max_amount) }}</div>
+              {% endif %}
+            </td>
+            <td class="text-center small text-muted">{{ r.occurrences }}×</td>
+            <td class="text-end small text-muted">{{ r.last_date.strftime('%d %b %Y') }}</td>
+            <td class="text-end pe-3 small">
+              {% if r.next_date %}
+              <span class="{% if r.next_date <= today %}text-warning fw-semibold{% else %}text-muted{% endif %}">
+                {{ r.next_date.strftime('%d %b %Y') }}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer bg-white border-0 text-muted small px-3 py-2">
+    <i class="bi bi-info-circle me-1"></i>Detected from transactions appearing across {{ 2 }}+ months with similar amounts.
+  </div>
+</div>
+{% endif %}
+
+<!-- Set / Edit Budget modal -->
+<div class="modal fade" id="budgetModal" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title fw-bold" id="budgetModalTitle">Set Budget</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editBudgetId">
+        <div class="mb-3">
+          <label class="form-label fw-semibold small">Category</label>
+          <select id="budgetCat" class="form-select">
+            {% for cat in ['Food & Dining','Shopping','Transport','Utilities','Healthcare',
+                           'Entertainment','Rent','Education','Insurance','EMI / Loan',
+                           'Travel','Groceries','Investment','Personal Transfer','Uncategorized'] %}
+            <option>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold small">Monthly limit ({{ current_user.base_currency }})</label>
+          <input type="number" id="budgetAmt" class="form-control" min="1" step="100" placeholder="e.g. 5000">
+        </div>
+        <div id="budgetErr" class="text-danger small d-none"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-primary w-100 fw-semibold" onclick="saveBudget()">Save Budget</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MODAL = new bootstrap.Modal(document.getElementById('budgetModal'));
+
+function openNew(cat) {
+  document.getElementById('budgetModalTitle').textContent = 'Set Budget';
+  document.getElementById('editBudgetId').value = '';
+  document.getElementById('budgetCat').value = cat || '';
+  document.getElementById('budgetAmt').value = '';
+  document.getElementById('budgetErr').classList.add('d-none');
+  MODAL.show();
+}
+
+function openEdit(id, cat, amount) {
+  document.getElementById('budgetModalTitle').textContent = 'Edit Budget';
+  document.getElementById('editBudgetId').value = id;
+  document.getElementById('budgetCat').value = cat;
+  document.getElementById('budgetAmt').value = amount;
+  document.getElementById('budgetErr').classList.add('d-none');
+  MODAL.show();
+}
+
+async function saveBudget() {
+  const errEl = document.getElementById('budgetErr');
+  errEl.classList.add('d-none');
+  const cat = document.getElementById('budgetCat').value;
+  const amt = parseFloat(document.getElementById('budgetAmt').value);
+  if (!cat || !amt || amt <= 0) {
+    errEl.textContent = 'Enter a valid category and amount.';
+    errEl.classList.remove('d-none');
+    return;
+  }
+  const res = await fetch('/api/budgets', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({category: cat, amount: amt})
+  });
+  const data = await res.json();
+  if (data.success) { location.reload(); }
+  else {
+    errEl.textContent = data.error || 'Something went wrong.';
+    errEl.classList.remove('d-none');
+  }
+}
+
+async function deleteBudget(id, btn) {
+  if (!confirm('Remove this budget?')) return;
+  const res = await fetch(`/api/budgets/${id}/delete`, {method:'POST'});
+  if ((await res.json()).success) btn.closest('.col-sm-6').remove();
+}
+</script>
+{% endblock %}

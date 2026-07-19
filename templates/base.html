@@ -44,6 +44,10 @@
              href="{{ url_for('upload') }}"><i class="bi bi-cloud-upload me-1"></i>Upload</a>
         </li>
         <li class="nav-item">
+          <a class="nav-link rounded px-3 {% if request.endpoint=='budgets' %}active bg-white bg-opacity-10{% endif %}"
+             href="{{ url_for('budgets') }}"><i class="bi bi-bullseye me-1"></i>Budgets</a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link rounded px-3 {% if request.endpoint=='reports' %}active bg-white bg-opacity-10{% endif %}"
              href="{{ url_for('reports') }}"><i class="bi bi-bar-chart-line me-1"></i>Reports</a>
         </li>
@@ -99,6 +103,7 @@
   <a href="{{ url_for('accounts') }}"     class="mbn-item {% if request.endpoint=='accounts'     %}active{% endif %}"><i class="bi bi-wallet2"></i><span>Accounts</span></a>
   <a href="{{ url_for('upload') }}"       class="mbn-item mbn-upload {% if request.endpoint=='upload'       %}active{% endif %}"><i class="bi bi-cloud-upload-fill"></i><span>Upload</span></a>
   <a href="{{ url_for('transactions') }}" class="mbn-item {% if request.endpoint=='transactions' %}active{% endif %}"><i class="bi bi-list-ul"></i><span>Txns</span></a>
+  <a href="{{ url_for('budgets') }}"      class="mbn-item {% if request.endpoint=='budgets' %}active{% endif %}"><i class="bi bi-bullseye"></i><span>Budgets</span></a>
   <a href="{{ url_for('reports') }}"      class="mbn-item {% if request.endpoint in ['reports','networth'] %}active{% endif %}"><i class="bi bi-bar-chart-line"></i><span>Reports</span></a>
 </nav>
 {% endif %}

@@ -104,6 +104,20 @@ class UploadLog(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Budget(db.Model):
+    """Monthly spending limit per category, in the user's base currency."""
+    __tablename__ = 'budgets'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    category = db.Column(db.String(100), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'category', name='unique_budget'),
+    )
+
+
 class PayeeRule(db.Model):
     """User-defined payee → category memory. Applied before auto_categorize on every import."""
     __tablename__ = 'payee_rules'

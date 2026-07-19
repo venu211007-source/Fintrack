@@ -10,7 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import extract, text
 
-from models import db, User, Account, Transaction, Asset, Liability, ExchangeRate, UploadLog, PayeeRule
+from models import db, User, Account, Transaction, Asset, Liability, ExchangeRate, UploadLog, PayeeRule, Budget
 from parsers import parse_bank_statement, get_column_preview, process_transactions
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -512,6 +512,10 @@ def import_transactions():
 
     acc = Account.query.filter_by(id=account_id, user_id=current_user.id).first_or_404()
 
+    # Enforce upload quota at import time (not just at preview time)
+    if not current_user.is_premium and _uploads_this_month(current_user.id) >= FREE_UPLOAD_LIMIT:
+        return jsonify({'error': f'Monthly upload limit reached ({FREE_UPLOAD_LIMIT} uploads). Upgrade to Premium for unlimited uploads.'}), 403
+
     try:
         df, mapping = parse_bank_statement(fpath, col_map)
         rows = process_transactions(df, mapping)
@@ -783,6 +787,123 @@ def list_payee_rules():
 def delete_payee_rule(rid):
     r = PayeeRule.query.filter_by(id=rid, user_id=current_user.id).first_or_404()
     db.session.delete(r)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ---------- budgets ----------
+
+def _detect_recurring(user_id, min_months=2):
+    """Return a list of recurring payment patterns detected from transaction history."""
+    import re as _re
+    from collections import defaultdict
+
+    txns = (Transaction.query.join(Account)
+            .filter(Account.user_id == user_id,
+                    Transaction.amount < 0,
+                    Transaction.is_internal_transfer == False)
+            .order_by(Transaction.date)
+            .all())
+
+    def _norm(desc):
+        d = _re.sub(r'\d{6,}', '', (desc or '').lower())
+        d = _re.sub(r'upi/[a-zA-Z0-9/\-]+', 'upi', d)
+        d = _re.sub(r'[^a-z\s]', ' ', d)
+        return ' '.join(d.split())[:50]
+
+    # Group by (normalized description, amount rounded to nearest 10)
+    groups = defaultdict(list)
+    for t in txns:
+        key = (_norm(t.description), round(abs(t.amount) / 10) * 10)
+        groups[key].append(t)
+
+    recurring = []
+    for (desc_key, _), group in groups.items():
+        months = {(t.date.year, t.date.month) for t in group}
+        if len(months) < min_months:
+            continue
+        amounts = [abs(t.amount) for t in group]
+        avg_amt = sum(amounts) / len(amounts)
+        last_t = max(group, key=lambda t: t.date)
+        dates = sorted(t.date for t in group)
+        if len(dates) >= 2:
+            gaps = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
+            avg_gap = sum(gaps) / len(gaps)
+            next_date = last_t.date + timedelta(days=round(avg_gap))
+        else:
+            next_date = None
+        recurring.append({
+            'description': last_t.description[:55],
+            'category': last_t.category,
+            'avg_amount': round(avg_amt, 2),
+            'min_amount': round(min(amounts), 2),
+            'max_amount': round(max(amounts), 2),
+            'occurrences': len(group),
+            'months_seen': len(months),
+            'last_date': last_t.date,
+            'next_date': next_date,
+            'currency': last_t.account.currency,
+        })
+
+    recurring.sort(key=lambda x: x['avg_amount'], reverse=True)
+    return recurring[:25]
+
+
+@app.route('/budgets')
+@login_required
+def budgets():
+    now = datetime.utcnow()
+    # Actual spend this month per category (expenses only, excluding transfers)
+    month_txns = (Transaction.query.join(Account)
+                  .filter(Account.user_id == current_user.id,
+                          Transaction.amount < 0,
+                          Transaction.is_internal_transfer == False,
+                          extract('month', Transaction.date) == now.month,
+                          extract('year',  Transaction.date) == now.year)
+                  .all())
+    spent = {}
+    for t in month_txns:
+        cat = t.category or 'Uncategorized'
+        spent[cat] = round(spent.get(cat, 0) + abs(to_base(t.amount, t.account.currency, current_user)), 2)
+
+    user_budgets = Budget.query.filter_by(user_id=current_user.id).order_by(Budget.category).all()
+    recurring = _detect_recurring(current_user.id)
+
+    from datetime import date as _date
+    return render_template('budgets.html',
+                           budgets=user_budgets,
+                           spent=spent,
+                           recurring=recurring,
+                           today=_date.today(),
+                           current_month=now.strftime('%B %Y'))
+
+
+@app.route('/api/budgets', methods=['POST'])
+@login_required
+def upsert_budget():
+    d = request.get_json()
+    category = (d.get('category') or '').strip()
+    try:
+        amount = float(d.get('amount', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid amount.'}), 400
+    if not category or amount <= 0:
+        return jsonify({'error': 'Category and a positive amount are required.'}), 400
+
+    existing = Budget.query.filter_by(user_id=current_user.id, category=category).first()
+    if existing:
+        existing.amount = amount
+    else:
+        db.session.add(Budget(user_id=current_user.id, category=category, amount=amount))
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/budgets/<int:bid>/delete', methods=['POST'])
+@login_required
+def delete_budget(bid):
+    b = Budget.query.filter_by(id=bid, user_id=current_user.id).first_or_404()
+    db.session.delete(b)
     db.session.commit()
     return jsonify({'success': True})
 
