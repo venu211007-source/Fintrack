@@ -733,6 +733,58 @@ def auto_categorize(description):
     return _keyword_match(desc)
 
 
+_VALID_CATEGORIES = {
+    'Salary', 'Investment', 'Food & Dining', 'Shopping', 'Transport',
+    'Utilities', 'Healthcare', 'Entertainment', 'Rent', 'Education',
+    'Insurance', 'EMI / Loan', 'Travel', 'Groceries',
+    'Personal Transfer', 'Bank Transfer', 'Uncategorized',
+}
+
+
+def llm_categorize_batch(descriptions, api_key):
+    """Send a batch of uncategorized transaction descriptions to Claude for classification.
+
+    Returns a list of category strings in the same order as `descriptions`.
+    Falls back to 'Uncategorized' silently on any error so imports never fail.
+    """
+    if not descriptions or not api_key:
+        return ['Uncategorized'] * len(descriptions)
+
+    try:
+        import anthropic, json as _json
+
+        numbered = '\n'.join(f'{i + 1}. {d}' for i, d in enumerate(descriptions))
+        cats_str = ', '.join(sorted(_VALID_CATEGORIES - {'Uncategorized'}))
+
+        prompt = (
+            f"You are a bank transaction categorizer for Indian and international banks.\n"
+            f"Classify each transaction into exactly one of these categories:\n"
+            f"{cats_str}, Uncategorized\n\n"
+            f"Rules:\n"
+            f"- UPI/FAST/PayNow to a person name with no merchant context → Personal Transfer\n"
+            f"- NEFT/IMPS/RTGS/wire between bank accounts → Bank Transfer\n"
+            f"- SIP/mutual fund/stock purchase → Investment\n"
+            f"- If genuinely unclear → Uncategorized\n"
+            f"- Reply with ONLY a JSON array of strings, one per line item, same order, no extra text.\n\n"
+            f"Transactions:\n{numbered}"
+        )
+
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model='claude-haiku-4-5-20251001',
+            max_tokens=512,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+        text = msg.content[0].text.strip()
+        start, end = text.index('['), text.rindex(']') + 1
+        result = _json.loads(text[start:end])
+        if len(result) != len(descriptions):
+            return ['Uncategorized'] * len(descriptions)
+        return [r if r in _VALID_CATEGORIES else 'Uncategorized' for r in result]
+    except Exception:
+        return ['Uncategorized'] * len(descriptions)
+
+
 def process_transactions(df, column_mapping):
     date_col   = column_mapping.get('date')
     desc_col   = column_mapping.get('description')

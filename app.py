@@ -517,20 +517,39 @@ def import_transactions():
         return jsonify({'error': f'Monthly upload limit reached ({FREE_UPLOAD_LIMIT} uploads). Upgrade to Premium for unlimited uploads.'}), 403
 
     try:
+        from parsers import extract_upi_payee, llm_categorize_batch
         df, mapping = parse_bank_statement(fpath, col_map)
         rows = process_transactions(df, mapping)
 
-        # Load user's payee rules once for the whole batch
-        from parsers import extract_upi_payee
+        # ── Pass 1: PayeeRule overrides (never touches user-corrected categories) ──
         payee_rules = {
             pr.payee_key: pr.category
             for pr in PayeeRule.query.filter_by(user_id=current_user.id).all()
         }
+        if payee_rules:
+            for r in rows:
+                pk, _ = extract_upi_payee(r['description'])
+                if pk and pk in payee_rules:
+                    r['category'] = payee_rules[pk]
+                else:
+                    desc_key = r['description'].lower().strip()[:100]
+                    if desc_key in payee_rules:
+                        r['category'] = payee_rules[desc_key]
 
-        imported = 0
-        skipped = 0
+        # ── Pass 2: LLM batch for anything still Uncategorized ──────────────────
+        api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+        if api_key:
+            unc_idx = [i for i, r in enumerate(rows) if r['category'] == 'Uncategorized']
+            if unc_idx:
+                llm_cats = llm_categorize_batch(
+                    [rows[i]['description'] for i in unc_idx], api_key
+                )
+                for i, cat in zip(unc_idx, llm_cats):
+                    rows[i]['category'] = cat
+
+        # ── Pass 3: Insert (dedup check) ────────────────────────────────────────
+        imported = skipped = 0
         for r in rows:
-            # basic dedup: same account + date + amount + description
             exists = Transaction.query.filter_by(
                 account_id=acc.id, date=r['date'],
                 amount=r['amount'], description=r['description']
@@ -538,36 +557,21 @@ def import_transactions():
             if exists:
                 skipped += 1
                 continue
-
-            # Apply payee rule if one exists (overrides auto_categorize)
-            category = r['category']
-            if payee_rules:
-                pk, _ = extract_upi_payee(r['description'])
-                if pk and pk in payee_rules:
-                    category = payee_rules[pk]
-                else:
-                    # Also check plain description match for non-UPI rules
-                    desc_key = r['description'].lower().strip()[:100]
-                    if desc_key in payee_rules:
-                        category = payee_rules[desc_key]
-
-            t = Transaction(
+            db.session.add(Transaction(
                 account_id=acc.id,
                 date=r['date'],
                 description=r['description'],
                 amount=r['amount'],
                 amount_base=to_base(r['amount'], acc.currency, current_user),
-                category=category,
+                category=r['category'],
                 transaction_type=r['transaction_type'],
-            )
-            db.session.add(t)
+            ))
             imported += 1
 
         db.session.commit()
         if os.path.exists(fpath):
             os.remove(fpath)
 
-        # Log this upload for monthly quota tracking
         db.session.add(UploadLog(user_id=current_user.id))
         db.session.commit()
 
